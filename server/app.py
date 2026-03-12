@@ -1,8 +1,12 @@
+import sys
+import os
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-from database import Database
 from datetime import datetime
-import os
+
+# Добавляем путь к папке database
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from database.database import Database
 
 app = Flask(__name__, static_folder='../client', static_url_path='')
 CORS(app)

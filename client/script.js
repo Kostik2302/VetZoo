@@ -1,4 +1,6 @@
 const API_URL = 'http://localhost:5000/api';
+let currentAnimalModal = null;
+let currentAnimalId = null;
 
 // Загрузка всех животных
 async function loadAnimals() {
@@ -43,6 +45,8 @@ function displayAnimals(animals) {
 // Просмотр деталей животного
 async function viewAnimal(id) {
     try {
+        currentAnimalId = id;
+        
         // Загружаем информацию о животном
         const response = await fetch(`${API_URL}/animals/${id}`);
         const animal = await response.json();
@@ -71,7 +75,11 @@ async function viewAnimal(id) {
         document.getElementById('vaccineAnimalId').value = id;
         
         // Показываем модальное окно
-        new bootstrap.Modal(document.getElementById('viewAnimalModal')).show();
+        if (currentAnimalModal) {
+            currentAnimalModal.hide();
+        }
+        currentAnimalModal = new bootstrap.Modal(document.getElementById('viewAnimalModal'));
+        currentAnimalModal.show();
     } catch (error) {
         alert('Ошибка загрузки: ' + error);
     }
@@ -139,29 +147,40 @@ async function addAnimal() {
         });
         
         if (response.ok) {
-            bootstrap.Modal.getInstance(document.getElementById('addAnimalModal')).hide();
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addAnimalModal'));
+            modal.hide();
             loadAnimals();
             document.getElementById('addAnimalForm').reset();
+            
+            // Убираем затемнение
+            document.body.classList.remove('modal-open');
+            document.querySelector('.modal-backdrop')?.remove();
         }
     } catch (error) {
         alert('Ошибка: ' + error);
     }
 }
 
-// Обновление статуса
+// Обновление статуса - ИСПРАВЛЕНО!
 async function updateStatus() {
-    const animalId = document.getElementById('examAnimalId').value;
+    if (!currentAnimalId) return;
+    
     const status = document.getElementById('healthStatus').value;
     
     try {
-        await fetch(`${API_URL}/animals/${animalId}/status`, {
+        const response = await fetch(`${API_URL}/animals/${currentAnimalId}/status`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({status: status})
         });
         
-        // Обновляем карточку
-        viewAnimal(animalId);
+        if (response.ok) {
+            // Обновляем информацию в текущем модальном окне
+            await viewAnimal(currentAnimalId);
+            
+            // Обновляем список животных на главной
+            await loadAnimals();
+        }
     } catch (error) {
         alert('Ошибка: ' + error);
     }
@@ -169,8 +188,12 @@ async function updateStatus() {
 
 // Показать форму добавления осмотра
 function showAddExamForm() {
-    bootstrap.Modal.getInstance(document.getElementById('viewAnimalModal')).hide();
-    new bootstrap.Modal(document.getElementById('addExamModal')).show();
+    if (currentAnimalModal) {
+        currentAnimalModal.hide();
+    }
+    setTimeout(() => {
+        new bootstrap.Modal(document.getElementById('addExamModal')).show();
+    }, 300);
 }
 
 // Добавление осмотра
@@ -191,9 +214,17 @@ async function addExamination() {
         });
         
         if (response.ok) {
-            bootstrap.Modal.getInstance(document.getElementById('addExamModal')).hide();
-            const animalId = document.getElementById('examAnimalId').value;
-            viewAnimal(animalId);
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addExamModal'));
+            modal.hide();
+            
+            // Убираем затемнение
+            document.body.classList.remove('modal-open');
+            document.querySelector('.modal-backdrop')?.remove();
+            
+            // Возвращаемся к карточке животного
+            setTimeout(() => {
+                viewAnimal(data.animal_id);
+            }, 300);
         }
     } catch (error) {
         alert('Ошибка: ' + error);
@@ -202,8 +233,12 @@ async function addExamination() {
 
 // Показать форму добавления прививки
 function showAddVaccineForm() {
-    bootstrap.Modal.getInstance(document.getElementById('viewAnimalModal')).hide();
-    new bootstrap.Modal(document.getElementById('addVaccineModal')).show();
+    if (currentAnimalModal) {
+        currentAnimalModal.hide();
+    }
+    setTimeout(() => {
+        new bootstrap.Modal(document.getElementById('addVaccineModal')).show();
+    }, 300);
 }
 
 // Добавление прививки
@@ -224,14 +259,29 @@ async function addVaccination() {
         });
         
         if (response.ok) {
-            bootstrap.Modal.getInstance(document.getElementById('addVaccineModal')).hide();
-            const animalId = document.getElementById('vaccineAnimalId').value;
-            viewAnimal(animalId);
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addVaccineModal'));
+            modal.hide();
+            
+            // Убираем затемнение
+            document.body.classList.remove('modal-open');
+            document.querySelector('.modal-backdrop')?.remove();
+            
+            // Возвращаемся к карточке животного
+            setTimeout(() => {
+                viewAnimal(data.animal_id);
+            }, 300);
         }
     } catch (error) {
         alert('Ошибка: ' + error);
     }
 }
+
+// Добавляем обработчик закрытия модальных окон
+document.addEventListener('hidden.bs.modal', function (event) {
+    // Убираем затемнение при закрытии любого модального окна
+    document.body.classList.remove('modal-open');
+    document.querySelector('.modal-backdrop')?.remove();
+});
 
 // Загружаем животных при старте
 document.addEventListener('DOMContentLoaded', loadAnimals);

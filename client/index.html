@@ -107,12 +107,14 @@
                         <div class="tab-pane fade show active" id="info">
                             <div id="animalInfo"></div>
                             <hr>
+                            <!-- В модальном окне просмотра животного, секция с обновлением статуса -->
                             <h6>Обновить статус здоровья:</h6>
                             <select class="form-control mb-2" id="healthStatus">
                                 <option value="здоров">Здоров</option>
                                 <option value="болен">Болен</option>
                                 <option value="на лечении">На лечении</option>
                                 <option value="карантин">Карантин</option>
+                                <option value="снят с учета">Снят с учета</option>
                             </select>
                             <button class="btn btn-sm btn-primary" onclick="updateStatus()">Обновить статус</button>
                         </div>
