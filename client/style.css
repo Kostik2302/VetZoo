@@ -1,0 +1,47 @@
+.animal-card {
+    margin-bottom: 20px;
+    transition: transform 0.2s;
+}
+
+.animal-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.status-badge {
+    font-size: 0.8rem;
+    padding: 5px 10px;
+    border-radius: 20px;
+}
+
+.status-здоров {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.status-болен {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.status-на лечении {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.status-карантин {
+    background-color: #cce5ff;
+    color: #004085;
+}
+
+.timeline-item {
+    padding: 10px;
+    border-left: 3px solid #007bff;
+    margin-bottom: 10px;
+    background-color: #f8f9fa;
+}
+
+.timeline-date {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
