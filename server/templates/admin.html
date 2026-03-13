@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Управление персоналом</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-dark bg-primary">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">👥 Управление персоналом</span>
+            <div>
+                <button class="btn btn-sm btn-outline-light me-2" onclick="showChangeCredentialsModal()">⚙️ Сменить пароль</button>
+                <a href="/" class="btn btn-sm btn-light">На главную</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">Добавить нового сотрудника</div>
+                    <div class="card-body">
+                        <form id="addUserForm">
+                            <div class="mb-3">
+                                <label class="form-label">Имя пользователя</label>
+                                <input type="text" class="form-control" id="username" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Пароль</label>
+                                <input type="password" class="form-control" id="password" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Полное имя</label>
+                                <input type="text" class="form-control" id="fullName">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Роль</label>
+                                <select class="form-control" id="role">
+                                    <option value="vet">Ветеринар</option>
+                                    <option value="keeper">Кипер</option>
+                                </select>
+                            </div>
+                            <button type="button" class="btn btn-primary" onclick="addUser()">Добавить</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">Список сотрудников</div>
+                    <div class="card-body">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Имя</th>
+                                    <th>Полное имя</th>
+                                    <th>Роль</th>
+                                    <th>Дата создания</th>
+                                    <th>Действия</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно редактирования полного имени -->
+    <div class="modal fade" id="editFullNameModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Редактировать полное имя</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editFullNameForm">
+                        <input type="hidden" id="editUserId">
+                        <div class="mb-3">
+                            <label class="form-label">Новое полное имя</label>
+                            <input type="text" class="form-control" id="newFullName" required>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" onclick="updateFullName()">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно смены логина/пароля -->
+    <div class="modal fade" id="changeCredentialsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Изменение данных учётной записи</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="changeCredentialsForm">
+                        <div class="mb-3">
+                            <label class="form-label">Новый логин (оставьте пустым, если не хотите менять)</label>
+                            <input type="text" class="form-control" id="newUsername">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Новый пароль (оставьте пустым, если не хотите менять)</label>
+                            <input type="password" class="form-control" id="newPassword">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Подтверждение нового пароля</label>
+                            <input type="password" class="form-control" id="confirmNewPassword">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" onclick="changeCredentials()">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_URL = 'http://localhost:5000/api';
+
+        // Функции для смены пароля
+        function showChangeCredentialsModal() {
+            document.getElementById('newUsername').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmNewPassword').value = '';
+            new bootstrap.Modal(document.getElementById('changeCredentialsModal')).show();
+        }
+
+        async function changeCredentials() {
+            const newUsername = document.getElementById('newUsername').value.trim();
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmPassword = document.getElementById('confirmNewPassword').value;
+            
+            if (newPassword || confirmPassword) {
+                if (newPassword !== confirmPassword) {
+                    alert('Пароли не совпадают');
+                    return;
+                }
+                if (newPassword.length < 3) {
+                    alert('Пароль должен быть не менее 3 символов');
+                    return;
+                }
+            }
+            
+            if (!newUsername && !newPassword) {
+                alert('Введите новые данные для изменения');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/user/change-credentials`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        new_username: newUsername || undefined,
+                        new_password: newPassword || undefined
+                    })
+                });
+                
+                if (response.ok) {
+                    alert('Данные успешно обновлены');
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('changeCredentialsModal'));
+                    modal.hide();
+                } else {
+                    const error = await response.json();
+                    alert('Ошибка: ' + (error.error || 'Неизвестная ошибка'));
+                }
+            } catch (error) {
+                alert('Ошибка соединения: ' + error);
+            }
+        }
+
+        // Функция для открытия модалки редактирования полного имени
+        function showEditFullNameModal(userId, currentFullName) {
+            document.getElementById('editUserId').value = userId;
+            document.getElementById('newFullName').value = currentFullName || '';
+            new bootstrap.Modal(document.getElementById('editFullNameModal')).show();
+        }
+
+        // Функция обновления полного имени
+        async function updateFullName() {
+            const userId = document.getElementById('editUserId').value;
+            const newFullName = document.getElementById('newFullName').value.trim();
+            
+            if (!newFullName) {
+                alert('Введите полное имя');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/users/${userId}/fullname`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    credentials: 'include',
+                    body: JSON.stringify({ full_name: newFullName })
+                });
+                
+                if (response.ok) {
+                    alert('Полное имя обновлено');
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('editFullNameModal'));
+                    modal.hide();
+                    loadUsers();
+                } else {
+                    const error = await response.json();
+                    alert('Ошибка: ' + (error.error || 'Неизвестная ошибка'));
+                }
+            } catch (error) {
+                alert('Ошибка соединения: ' + error);
+            }
+        }
+
+        async function loadUsers() {
+            const response = await fetch(`${API_URL}/users`, { credentials: 'include' });
+            if (response.ok) {
+                const users = await response.json();
+                const tbody = document.getElementById('usersTableBody');
+                tbody.innerHTML = '';
+                users.forEach(u => {
+                    const row = `<tr>
+                        <td>${u.id}</td>
+                        <td>${u.username}</td>
+                        <td>${u.full_name || ''}</td>
+                        <td>${u.role === 'vet' ? 'Ветеринар' : u.role === 'admin' ? 'Администратор' : 'Кипер'}</td>
+                        <td>${u.created_at}</td>
+                        <td>
+                            <button class="btn btn-sm btn-info me-1" onclick="showEditFullNameModal(${u.id}, '${u.full_name || ''}')">✏️ Имя</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">🗑️ Удалить</button>
+                        </td>
+                    </tr>`;
+                    tbody.innerHTML += row;
+                });
+            } else {
+                alert('Ошибка загрузки пользователей');
+            }
+        }
+
+        async function addUser() {
+            const data = {
+                username: document.getElementById('username').value,
+                password: document.getElementById('password').value,
+                full_name: document.getElementById('fullName').value,
+                role: document.getElementById('role').value
+            };
+            const response = await fetch(`${API_URL}/users`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(data)
+            });
+            if (response.ok) {
+                document.getElementById('addUserForm').reset();
+                loadUsers();
+            } else {
+                const err = await response.json();
+                alert('Ошибка: ' + (err.error || 'Неизвестная ошибка'));
+            }
+        }
+
+        async function deleteUser(id) {
+            if (!confirm('Удалить пользователя?')) return;
+            const response = await fetch(`${API_URL}/users/${id}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+            if (response.ok) {
+                loadUsers();
+            } else {
+                const err = await response.json();
+                alert('Ошибка: ' + (err.error || 'Нельзя удалить'));
+            }
+        }
+
+        // Проверка авторизации при загрузке
+        fetch(`${API_URL}/me`, { credentials: 'include' })
+            .then(res => {
+                if (!res.ok) window.location.href = '/login';
+                return res.json();
+            })
+            .then(user => {
+                if (user.role !== 'admin') window.location.href = '/';
+                else loadUsers();
+            })
+            .catch(() => window.location.href = '/login');
+    </script>
+</body>
+</html>

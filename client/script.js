@@ -1,11 +1,56 @@
 const API_URL = 'http://localhost:5000/api';
 let currentAnimalModal = null;
 let currentAnimalId = null;
+let currentUserRole = null;
+
+// Функция для перевода роли на русский
+function translateRole(role) {
+    const roles = {
+        'admin': 'администратор',
+        'vet': 'ветеринар',
+        'keeper': 'кипер'
+    };
+    return roles[role] || role;
+}
+
+// Проверка авторизации и получение роли
+async function checkAuth() {
+    try {
+        const response = await fetch(`${API_URL}/me`, {
+            credentials: 'include'
+        });
+        if (response.ok) {
+            const user = await response.json();
+            currentUserRole = user.role;
+            document.getElementById('userDisplay').innerText = 
+                `${user.full_name || user.username} (${translateRole(user.role)})`;
+            updateUIBasedOnRole();
+        } else {
+            window.location.href = '/login';
+        }
+    } catch (error) {
+        console.error('Ошибка проверки авторизации:', error);
+        window.location.href = '/login';
+    }
+}
+
+// Обновление интерфейса в зависимости от роли
+function updateUIBasedOnRole() {
+    const isVet = currentUserRole === 'vet';
+    const isAdmin = currentUserRole === 'admin';
+
+    document.getElementById('addAnimalBtn').style.display = isVet ? 'inline-block' : 'none';
+    document.getElementById('adminPanelBtn').style.display = isAdmin ? 'inline-block' : 'none';
+    document.getElementById('changeCredentialsBtn').style.display = 'inline-block';
+}
 
 // Загрузка всех животных
 async function loadAnimals() {
     try {
-        const response = await fetch(`${API_URL}/animals`);
+        const response = await fetch(`${API_URL}/animals`, {
+            credentials: 'include'
+        });
+        if (!response.ok) throw new Error('Ошибка загрузки');
         const animals = await response.json();
         displayAnimals(animals);
     } catch (error) {
@@ -34,6 +79,11 @@ function displayAnimals(animals) {
                         <button class="btn btn-sm btn-primary" onclick="viewAnimal(${animal.id})">
                             Подробнее
                         </button>
+                        ${currentUserRole === 'vet' ? `
+                            <button class="btn btn-sm btn-warning mt-2" onclick="editAnimal(${animal.id})">
+                                ✏️ Редактировать
+                            </button>
+                        ` : ''}
                     </div>
                 </div>
             </div>
@@ -47,14 +97,14 @@ async function viewAnimal(id) {
     try {
         currentAnimalId = id;
         
-        // Загружаем информацию о животном
-        const response = await fetch(`${API_URL}/animals/${id}`);
+        const response = await fetch(`${API_URL}/animals/${id}`, {
+            credentials: 'include'
+        });
         const animal = await response.json();
         
         document.getElementById('viewAnimalTitle').textContent = `${animal.name} (${animal.species})`;
         document.getElementById('healthStatus').value = animal.health_status;
         
-        // Отображаем информацию
         document.getElementById('animalInfo').innerHTML = `
             <p><strong>ID:</strong> ${animal.id}</p>
             <p><strong>Дата прибытия:</strong> ${animal.arrival_date}</p>
@@ -64,17 +114,20 @@ async function viewAnimal(id) {
             <p><strong>Примечания:</strong> ${animal.notes || 'нет'}</p>
         `;
         
-        // Загружаем осмотры
         await loadExaminations(id);
-        
-        // Загружаем прививки
         await loadVaccinations(id);
+        await loadDiets(id);
         
-        // Сохраняем ID для модальных окон
         document.getElementById('examAnimalId').value = id;
         document.getElementById('vaccineAnimalId').value = id;
+        document.getElementById('dietAnimalId').value = id;
         
-        // Показываем модальное окно
+        const isVet = currentUserRole === 'vet';
+        document.getElementById('statusUpdateSection').style.display = isVet ? 'block' : 'none';
+        document.getElementById('addExamBtn').style.display = isVet ? 'inline-block' : 'none';
+        document.getElementById('addVaccineBtn').style.display = isVet ? 'inline-block' : 'none';
+        document.getElementById('addDietBtn').style.display = isVet ? 'inline-block' : 'none';
+        
         if (currentAnimalModal) {
             currentAnimalModal.hide();
         }
@@ -87,7 +140,9 @@ async function viewAnimal(id) {
 
 // Загрузка осмотров
 async function loadExaminations(animalId) {
-    const response = await fetch(`${API_URL}/animals/${animalId}/examinations`);
+    const response = await fetch(`${API_URL}/animals/${animalId}/examinations`, {
+        credentials: 'include'
+    });
     const exams = await response.json();
     
     const container = document.getElementById('examsList');
@@ -109,7 +164,9 @@ async function loadExaminations(animalId) {
 
 // Загрузка прививок
 async function loadVaccinations(animalId) {
-    const response = await fetch(`${API_URL}/animals/${animalId}/vaccinations`);
+    const response = await fetch(`${API_URL}/animals/${animalId}/vaccinations`, {
+        credentials: 'include'
+    });
     const vaccines = await response.json();
     
     const container = document.getElementById('vaccinesList');
@@ -124,6 +181,39 @@ async function loadVaccinations(animalId) {
             <div><strong>Вакцина:</strong> ${v.vaccine_name}</div>
             <div><strong>Ветеринар:</strong> ${v.veterinarian}</div>
             ${v.next_due_date ? `<div><strong>Следующая:</strong> ${v.next_due_date}</div>` : ''}
+        </div>
+    `).join('');
+}
+
+// Загрузка рационов
+async function loadDiets(animalId) {
+    const response = await fetch(`${API_URL}/animals/${animalId}/diets`, {
+        credentials: 'include'
+    });
+    const diets = await response.json();
+    
+    const container = document.getElementById('dietsList');
+    if (diets.length === 0) {
+        container.innerHTML = '<p class="text-muted">Рационов нет</p>';
+        return;
+    }
+    
+    container.innerHTML = diets.map(d => `
+        <div class="timeline-item">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="timeline-date">${d.start_date} ${d.end_date ? '— ' + d.end_date : ''}</div>
+                    <div><strong>Рацион:</strong> ${d.diet_name}</div>
+                    <div><strong>Тип корма:</strong> ${d.food_type}</div>
+                    <div><strong>Количество:</strong> ${d.quantity}</div>
+                    ${d.schedule ? `<div><strong>Расписание:</strong> ${d.schedule}</div>` : ''}
+                </div>
+                ${currentUserRole === 'vet' ? `
+                    <button class="btn btn-sm btn-danger" onclick="deleteDiet(${d.id}, ${animalId})">
+                        🗑️
+                    </button>
+                ` : ''}
+            </div>
         </div>
     `).join('');
 }
@@ -143,6 +233,7 @@ async function addAnimal() {
         const response = await fetch(`${API_URL}/animals`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
             body: JSON.stringify(data)
         });
         
@@ -151,17 +242,19 @@ async function addAnimal() {
             modal.hide();
             loadAnimals();
             document.getElementById('addAnimalForm').reset();
-            
-            // Убираем затемнение
             document.body.classList.remove('modal-open');
             document.querySelector('.modal-backdrop')?.remove();
+            alert('✅ Животное успешно добавлено');
+        } else {
+            const err = await response.json();
+            alert('Ошибка: ' + (err.error || 'Недостаточно прав'));
         }
     } catch (error) {
         alert('Ошибка: ' + error);
     }
 }
 
-// Обновление статуса - ИСПРАВЛЕНО!
+// Обновление статуса
 async function updateStatus() {
     if (!currentAnimalId) return;
     
@@ -171,15 +264,76 @@ async function updateStatus() {
         const response = await fetch(`${API_URL}/animals/${currentAnimalId}/status`, {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
             body: JSON.stringify({status: status})
         });
         
         if (response.ok) {
-            // Обновляем информацию в текущем модальном окне
             await viewAnimal(currentAnimalId);
-            
-            // Обновляем список животных на главной
             await loadAnimals();
+            alert('✅ Статус здоровья обновлён');
+        } else {
+            const err = await response.json();
+            alert('Ошибка: ' + (err.error || 'Недостаточно прав'));
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error);
+    }
+}
+
+// Редактирование животного
+async function editAnimal(id) {
+    try {
+        const response = await fetch(`${API_URL}/animals/${id}`, {
+            credentials: 'include'
+        });
+        const animal = await response.json();
+        
+        document.getElementById('editAnimalId').value = animal.id;
+        document.getElementById('editAnimalName').value = animal.name;
+        document.getElementById('editAnimalSpecies').value = animal.species;
+        document.getElementById('editArrivalDate').value = animal.arrival_date;
+        document.getElementById('editBirthDate').value = animal.birth_date || '';
+        document.getElementById('editEnclosure').value = animal.enclosure || '';
+        document.getElementById('editGender').value = animal.gender || '';
+        document.getElementById('editNotes').value = animal.notes || '';
+        
+        new bootstrap.Modal(document.getElementById('editAnimalModal')).show();
+    } catch (error) {
+        alert('Ошибка загрузки данных: ' + error);
+    }
+}
+
+// Сохранение изменений животного
+async function saveAnimalChanges() {
+    const animalId = document.getElementById('editAnimalId').value;
+    
+    const data = {
+        name: document.getElementById('editAnimalName').value,
+        species: document.getElementById('editAnimalSpecies').value,
+        arrival_date: document.getElementById('editArrivalDate').value,
+        birth_date: document.getElementById('editBirthDate').value || null,
+        gender: document.getElementById('editGender').value || null,
+        enclosure: document.getElementById('editEnclosure').value || null,
+        notes: document.getElementById('editNotes').value || null
+    };
+    
+    try {
+        const response = await fetch(`${API_URL}/animals/${animalId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editAnimalModal'));
+            modal.hide();
+            loadAnimals();
+            alert('✅ Данные животного обновлены');
+        } else {
+            const err = await response.json();
+            alert('Ошибка: ' + (err.error || 'Недостаточно прав'));
         }
     } catch (error) {
         alert('Ошибка: ' + error);
@@ -210,21 +364,23 @@ async function addExamination() {
         const response = await fetch(`${API_URL}/examinations`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
             body: JSON.stringify(data)
         });
         
         if (response.ok) {
             const modal = bootstrap.Modal.getInstance(document.getElementById('addExamModal'));
             modal.hide();
-            
-            // Убираем затемнение
             document.body.classList.remove('modal-open');
             document.querySelector('.modal-backdrop')?.remove();
             
-            // Возвращаемся к карточке животного
             setTimeout(() => {
                 viewAnimal(data.animal_id);
             }, 300);
+            alert('✅ Осмотр успешно добавлен');
+        } else {
+            const err = await response.json();
+            alert('Ошибка: ' + (err.error || 'Недостаточно прав'));
         }
     } catch (error) {
         alert('Ошибка: ' + error);
@@ -255,33 +411,167 @@ async function addVaccination() {
         const response = await fetch(`${API_URL}/vaccinations`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
             body: JSON.stringify(data)
         });
         
         if (response.ok) {
             const modal = bootstrap.Modal.getInstance(document.getElementById('addVaccineModal'));
             modal.hide();
-            
-            // Убираем затемнение
             document.body.classList.remove('modal-open');
             document.querySelector('.modal-backdrop')?.remove();
             
-            // Возвращаемся к карточке животного
             setTimeout(() => {
                 viewAnimal(data.animal_id);
             }, 300);
+            alert('✅ Прививка успешно добавлена');
+        } else {
+            const err = await response.json();
+            alert('Ошибка: ' + (err.error || 'Недостаточно прав'));
         }
     } catch (error) {
         alert('Ошибка: ' + error);
     }
 }
 
-// Добавляем обработчик закрытия модальных окон
-document.addEventListener('hidden.bs.modal', function (event) {
-    // Убираем затемнение при закрытии любого модального окна
+// Показать форму добавления рациона
+function showAddDietForm() {
+    if (currentAnimalModal) {
+        currentAnimalModal.hide();
+    }
+    setTimeout(() => {
+        new bootstrap.Modal(document.getElementById('addDietModal')).show();
+    }, 300);
+}
+
+// Добавление рациона
+async function addDiet() {
+    const data = {
+        animal_id: parseInt(document.getElementById('dietAnimalId').value),
+        diet_name: document.getElementById('dietName').value,
+        food_type: document.getElementById('foodType').value,
+        quantity: document.getElementById('quantity').value,
+        schedule: document.getElementById('schedule').value,
+        start_date: document.getElementById('dietStartDate').value,
+        end_date: document.getElementById('dietEndDate').value || null
+    };
+    
+    try {
+        const response = await fetch(`${API_URL}/diets`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addDietModal'));
+            modal.hide();
+            document.body.classList.remove('modal-open');
+            document.querySelector('.modal-backdrop')?.remove();
+            
+            setTimeout(() => {
+                viewAnimal(data.animal_id);
+            }, 300);
+            alert('✅ Рацион успешно добавлен');
+        } else {
+            const err = await response.json();
+            alert('Ошибка: ' + (err.error || 'Недостаточно прав'));
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error);
+    }
+}
+
+// Удаление рациона
+async function deleteDiet(dietId, animalId) {
+    if (!confirm('Вы уверены, что хотите удалить этот рацион?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}/diets/${dietId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+        
+        if (response.ok) {
+            alert('✅ Рацион удалён');
+            await viewAnimal(animalId);
+        } else {
+            const err = await response.json();
+            alert('Ошибка: ' + (err.error || 'Не удалось удалить рацион'));
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error);
+    }
+}
+
+// Показать модальное окно смены данных
+function showChangeCredentialsModal() {
+    document.getElementById('newUsername').value = '';
+    document.getElementById('newPassword').value = '';
+    document.getElementById('confirmNewPassword').value = '';
+    
+    new bootstrap.Modal(document.getElementById('changeCredentialsModal')).show();
+}
+
+// Смена логина/пароля
+async function changeCredentials() {
+    const newUsername = document.getElementById('newUsername').value.trim();
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmNewPassword').value;
+    
+    if (newPassword || confirmPassword) {
+        if (newPassword !== confirmPassword) {
+            alert('Пароли не совпадают');
+            return;
+        }
+        if (newPassword.length < 3) {
+            alert('Пароль должен быть не менее 3 символов');
+            return;
+        }
+    }
+    
+    if (!newUsername && !newPassword) {
+        alert('Введите новые данные для изменения');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}/user/change-credentials`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
+            body: JSON.stringify({
+                new_username: newUsername || undefined,
+                new_password: newPassword || undefined
+            })
+        });
+        
+        if (response.ok) {
+            alert('✅ Данные успешно обновлены');
+            
+            const modal = bootstrap.Modal.getInstance(document.getElementById('changeCredentialsModal'));
+            modal.hide();
+            
+            await checkAuth();
+        } else {
+            const error = await response.json();
+            alert('Ошибка: ' + (error.error || 'Неизвестная ошибка'));
+        }
+    } catch (error) {
+        alert('Ошибка соединения: ' + error);
+    }
+}
+
+// Обработчик закрытия модальных окон
+document.addEventListener('hidden.bs.modal', function () {
     document.body.classList.remove('modal-open');
     document.querySelector('.modal-backdrop')?.remove();
 });
 
-// Загружаем животных при старте
-document.addEventListener('DOMContentLoaded', loadAnimals);
+// При загрузке страницы
+document.addEventListener('DOMContentLoaded', () => {
+    checkAuth().then(() => loadAnimals());
+});

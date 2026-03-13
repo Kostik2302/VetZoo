@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VetZoo Control</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Навигация -->
+    <nav class="navbar navbar-dark bg-primary">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">🐾 VetZoo Control System</span>
+            <div class="d-flex text-white">
+                <span id="userDisplay" class="me-3"></span>
+                <button class="btn btn-sm btn-outline-light me-2" onclick="showChangeCredentialsModal()" id="changeCredentialsBtn">⚙️ Настройки</button>
+                <a href="/logout" class="btn btn-sm btn-light">Выйти</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Кнопки действий -->
+        <div class="row mb-4">
+            <div class="col">
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addAnimalModal" id="addAnimalBtn">
+                    ➕ Добавить животное
+                </button>
+                <button class="btn btn-success" onclick="loadAnimals()">
+                    🔄 Обновить список
+                </button>
+                <a href="/admin" class="btn btn-warning" id="adminPanelBtn" style="display: none;">👥 Управление персоналом</a>
+            </div>
+        </div>
+
+        <!-- Карточки животных -->
+        <div class="row" id="animalsList"></div>
+    </div>
+
+    <!-- Модальное окно добавления животного -->
+    <div class="modal fade" id="addAnimalModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Добавить новое животное</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addAnimalForm">
+                        <div class="mb-3">
+                            <label class="form-label">Кличка</label>
+                            <input type="text" class="form-control" id="animalName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Вид</label>
+                            <input type="text" class="form-control" id="animalSpecies" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Дата прибытия</label>
+                            <input type="date" class="form-control" id="arrivalDate">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Вольер</label>
+                            <input type="text" class="form-control" id="enclosure">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Пол</label>
+                            <select class="form-control" id="gender">
+                                <option value="">Не указан</option>
+                                <option value="М">Мужской</option>
+                                <option value="Ж">Женский</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Примечания</label>
+                            <textarea class="form-control" id="notes" rows="2"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" onclick="addAnimal()">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно редактирования животного -->
+    <div class="modal fade" id="editAnimalModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Редактировать животное</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editAnimalForm">
+                        <input type="hidden" id="editAnimalId">
+                        <div class="mb-3">
+                            <label class="form-label">Кличка</label>
+                            <input type="text" class="form-control" id="editAnimalName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Вид</label>
+                            <input type="text" class="form-control" id="editAnimalSpecies" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Дата прибытия</label>
+                            <input type="date" class="form-control" id="editArrivalDate">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Дата рождения</label>
+                            <input type="date" class="form-control" id="editBirthDate">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Вольер</label>
+                            <input type="text" class="form-control" id="editEnclosure">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Пол</label>
+                            <select class="form-control" id="editGender">
+                                <option value="">Не указан</option>
+                                <option value="М">Мужской</option>
+                                <option value="Ж">Женский</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Примечания</label>
+                            <textarea class="form-control" id="editNotes" rows="2"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" onclick="saveAnimalChanges()">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно просмотра животного -->
+    <div class="modal fade" id="viewAnimalModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="viewAnimalTitle">Информация о животном</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs" id="animalTabs">
+                        <li class="nav-item">
+                            <a class="nav-link active" data-bs-toggle="tab" href="#info">Информация</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#exams">Осмотры</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#vaccines">Прививки</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#diets">Рацион</a>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content mt-3">
+                        <div class="tab-pane fade show active" id="info">
+                            <div id="animalInfo"></div>
+                            <hr>
+                            <div id="statusUpdateSection" style="display: none;">
+                                <h6>Обновить статус здоровья:</h6>
+                                <select class="form-control mb-2" id="healthStatus">
+                                    <option value="здоров">Здоров</option>
+                                    <option value="болен">Болен</option>
+                                    <option value="на лечении">На лечении</option>
+                                    <option value="карантин">Карантин</option>
+                                    <option value="снят с учета">Снят с учета</option>
+                                </select>
+                                <button class="btn btn-sm btn-primary" onclick="updateStatus()">Обновить статус</button>
+                            </div>
+                        </div>
+                        <div class="tab-pane fade" id="exams">
+                            <button class="btn btn-sm btn-success mb-3" id="addExamBtn" style="display: none;" onclick="showAddExamForm()">➕ Добавить осмотр</button>
+                            <div id="examsList"></div>
+                        </div>
+                        <div class="tab-pane fade" id="vaccines">
+                            <button class="btn btn-sm btn-success mb-3" id="addVaccineBtn" style="display: none;" onclick="showAddVaccineForm()">➕ Добавить прививку</button>
+                            <div id="vaccinesList"></div>
+                        </div>
+                        <div class="tab-pane fade" id="diets">
+                            <button class="btn btn-sm btn-success mb-3" id="addDietBtn" style="display: none;" onclick="showAddDietForm()">➕ Добавить рацион</button>
+                            <div id="dietsList"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно добавления осмотра -->
+    <div class="modal fade" id="addExamModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Добавить осмотр</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addExamForm">
+                        <input type="hidden" id="examAnimalId">
+                        <div class="mb-3">
+                            <label class="form-label">Ветеринар</label>
+                            <input type="text" class="form-control" id="veterinarian" required placeholder="ФИО ветеринара">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Диагноз</label>
+                            <input type="text" class="form-control" id="diagnosis" required placeholder="Основной диагноз">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Лечение</label>
+                            <textarea class="form-control" id="treatment" rows="2" required placeholder="Назначенное лечение"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Дата</label>
+                            <input type="datetime-local" class="form-control" id="examDate">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" onclick="addExamination()">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно добавления прививки -->
+    <div class="modal fade" id="addVaccineModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Добавить прививку</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addVaccineForm">
+                        <input type="hidden" id="vaccineAnimalId">
+                        <div class="mb-3">
+                            <label class="form-label">Название вакцины</label>
+                            <input type="text" class="form-control" id="vaccineName" required placeholder="Например, Нобивак">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Ветеринар</label>
+                            <input type="text" class="form-control" id="vaccineVeterinarian" required placeholder="Кто проводил вакцинацию">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Дата прививки</label>
+                            <input type="date" class="form-control" id="vaccineDate">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Следующая прививка</label>
+                            <input type="date" class="form-control" id="nextVaccineDate">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" onclick="addVaccination()">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно добавления рациона -->
+    <div class="modal fade" id="addDietModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Добавить рацион</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="addDietForm">
+                        <input type="hidden" id="dietAnimalId">
+                        <div class="mb-3">
+                            <label class="form-label">Название рациона</label>
+                            <input type="text" class="form-control" id="dietName" required placeholder="Например, Летний рацион">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Тип корма</label>
+                            <input type="text" class="form-control" id="foodType" required placeholder="Сено, овощи, мясо, комбикорм">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Количество</label>
+                            <input type="text" class="form-control" id="quantity" required placeholder="например, 2 кг, 500 г, 1 ведро">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Расписание</label>
+                            <input type="text" class="form-control" id="schedule" placeholder="например, дважды в день, утром и вечером">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Дата начала</label>
+                            <input type="date" class="form-control" id="dietStartDate">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Дата окончания</label>
+                            <input type="date" class="form-control" id="dietEndDate">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" onclick="addDiet()">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно смены логина/пароля -->
+    <div class="modal fade" id="changeCredentialsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Изменение данных учётной записи</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="changeCredentialsForm">
+                        <div class="mb-3">
+                            <label class="form-label">Новый логин (оставьте пустым, если не хотите менять)</label>
+                            <input type="text" class="form-control" id="newUsername">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Новый пароль (оставьте пустым, если не хотите менять)</label>
+                            <input type="password" class="form-control" id="newPassword">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Подтверждение нового пароля</label>
+                            <input type="password" class="form-control" id="confirmNewPassword">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" onclick="changeCredentials()">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
