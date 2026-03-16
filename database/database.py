@@ -1,5 +1,4 @@
 import sqlite3
-from datetime import datetime
 
 class Database:
     def __init__(self, db_name="vetzoo.db"):
@@ -7,6 +6,7 @@ class Database:
         self.conn.row_factory = sqlite3.Row
         self.cursor = self.conn.cursor()
         self.create_tables()
+        self.migrate_tables()
     
     def create_tables(self):
         # Таблица животных
@@ -34,6 +34,7 @@ class Database:
                 diagnosis TEXT,
                 treatment TEXT,
                 notes TEXT,
+                is_scheduled INTEGER DEFAULT 0,
                 FOREIGN KEY (animal_id) REFERENCES animals (id) ON DELETE CASCADE
             )
         ''')
@@ -47,6 +48,7 @@ class Database:
                 vaccine_name TEXT NOT NULL,
                 veterinarian TEXT NOT NULL,
                 next_due_date TEXT,
+                is_scheduled INTEGER DEFAULT 0,
                 FOREIGN KEY (animal_id) REFERENCES animals (id) ON DELETE CASCADE
             )
         ''')
@@ -79,6 +81,27 @@ class Database:
         ''')
         
         self.conn.commit()
+    
+    def migrate_tables(self):
+        try:
+            self.cursor.execute("PRAGMA table_info(examinations)")
+            columns = [column[1] for column in self.cursor.fetchall()]
+            
+            if 'is_scheduled' not in columns:
+                print("📦 Добавляем колонку is_scheduled в таблицу examinations...")
+                self.cursor.execute("ALTER TABLE examinations ADD COLUMN is_scheduled INTEGER DEFAULT 0")
+                self.conn.commit()
+
+            self.cursor.execute("PRAGMA table_info(vaccinations)")
+            columns = [column[1] for column in self.cursor.fetchall()]
+            
+            if 'is_scheduled' not in columns:
+                print("📦 Добавляем колонку is_scheduled в таблицу vaccinations...")
+                self.cursor.execute("ALTER TABLE vaccinations ADD COLUMN is_scheduled INTEGER DEFAULT 0")
+                self.conn.commit()
+                
+        except Exception as e:
+            print(f"⚠️ Ошибка при миграции: {e}")
     
     # ----- Животные -----
     def add_animal(self, name, species, arrival_date, birth_date=None, gender=None, enclosure=None, notes=None):
@@ -127,11 +150,11 @@ class Database:
         return self.cursor.rowcount > 0
     
     # ----- Осмотры -----
-    def add_examination(self, animal_id, examination_date, veterinarian, diagnosis, treatment, notes=None):
+    def add_examination(self, animal_id, examination_date, veterinarian, diagnosis, treatment, notes=None, is_scheduled=0):
         self.cursor.execute('''
-            INSERT INTO examinations (animal_id, examination_date, veterinarian, diagnosis, treatment, notes)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (animal_id, examination_date, veterinarian, diagnosis, treatment, notes))
+            INSERT INTO examinations (animal_id, examination_date, veterinarian, diagnosis, treatment, notes, is_scheduled)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (animal_id, examination_date, veterinarian, diagnosis, treatment, notes, is_scheduled))
         self.conn.commit()
         return self.cursor.lastrowid
     
@@ -139,18 +162,42 @@ class Database:
         self.cursor.execute('SELECT * FROM examinations WHERE animal_id = ? ORDER BY examination_date DESC', (animal_id,))
         return self.cursor.fetchall()
     
+    def complete_examination(self, exam_id):
+        """Отметить осмотр как проведенный (снять статус запланированного)"""
+        self.cursor.execute('UPDATE examinations SET is_scheduled = 0 WHERE id = ?', (exam_id,))
+        self.conn.commit()
+        return self.cursor.rowcount > 0
+    
+    def delete_examination(self, exam_id):
+        """Удалить осмотр"""
+        self.cursor.execute('DELETE FROM examinations WHERE id = ?', (exam_id,))
+        self.conn.commit()
+        return self.cursor.rowcount > 0
+    
     # ----- Прививки -----
-    def add_vaccination(self, animal_id, vaccination_date, vaccine_name, veterinarian, next_due_date=None):
+    def add_vaccination(self, animal_id, vaccination_date, vaccine_name, veterinarian, next_due_date=None, is_scheduled=0):
         self.cursor.execute('''
-            INSERT INTO vaccinations (animal_id, vaccination_date, vaccine_name, veterinarian, next_due_date)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (animal_id, vaccination_date, vaccine_name, veterinarian, next_due_date))
+            INSERT INTO vaccinations (animal_id, vaccination_date, vaccine_name, veterinarian, next_due_date, is_scheduled)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (animal_id, vaccination_date, vaccine_name, veterinarian, next_due_date, is_scheduled))
         self.conn.commit()
         return self.cursor.lastrowid
     
     def get_animal_vaccinations(self, animal_id):
         self.cursor.execute('SELECT * FROM vaccinations WHERE animal_id = ? ORDER BY vaccination_date DESC', (animal_id,))
         return self.cursor.fetchall()
+    
+    def complete_vaccination(self, vacc_id):
+        """Отметить прививку как проведенную (снять статус запланированной)"""
+        self.cursor.execute('UPDATE vaccinations SET is_scheduled = 0 WHERE id = ?', (vacc_id,))
+        self.conn.commit()
+        return self.cursor.rowcount > 0
+    
+    def delete_vaccination(self, vacc_id):
+        """Удалить прививку"""
+        self.cursor.execute('DELETE FROM vaccinations WHERE id = ?', (vacc_id,))
+        self.conn.commit()
+        return self.cursor.rowcount > 0
     
     # ----- Рационы -----
     def add_diet(self, animal_id, diet_name, food_type, quantity, schedule, start_date, end_date=None):

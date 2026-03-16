@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Навигация -->
     <nav class="navbar navbar-dark bg-primary">
         <div class="container-fluid">
             <span class="navbar-brand mb-0 h1">🐾 VetZoo Control System</span>
@@ -26,7 +25,6 @@
     </nav>
 
     <div class="container mt-4">
-        <!-- Кнопки действий -->
         <div class="row mb-4">
             <div class="col">
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addAnimalModal" id="addAnimalBtn">
@@ -39,7 +37,6 @@
             </div>
         </div>
 
-        <!-- Карточки животных -->
         <div class="row" id="animalsList"></div>
     </div>
 
@@ -173,6 +170,11 @@
                             <a class="nav-link" data-bs-toggle="tab" href="#upcoming">Предстоящие</a>
                         </li>
                     </ul>
+
+                    <div class="btn-group mb-3" role="group">
+                        <button class="btn btn-sm btn-outline-warning" id="scheduleExamBtn" style="display: none;" onclick="showScheduleExamForm()">📅 Запланировать осмотр</button>
+                        <button class="btn btn-sm btn-outline-warning" id="scheduleVaccineBtn" style="display: none;" onclick="showScheduleVaccineForm()">📅 Запланировать прививку</button>
+                    </div>
                     
                     <div class="tab-content mt-3">
                         <div class="tab-pane fade show active" id="info">
@@ -224,15 +226,15 @@
                         <input type="hidden" id="examAnimalId">
                         <div class="mb-3">
                             <label class="form-label">Ветеринар</label>
-                            <input type="text" class="form-control" id="veterinarian" required placeholder="ФИО ветеринара">
+                            <input type="text" class="form-control" id="veterinarian" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Диагноз</label>
-                            <input type="text" class="form-control" id="diagnosis" required placeholder="Основной диагноз">
+                            <input type="text" class="form-control" id="diagnosis" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Лечение</label>
-                            <textarea class="form-control" id="treatment" rows="2" required placeholder="Назначенное лечение"></textarea>
+                            <textarea class="form-control" id="treatment" rows="2" required></textarea>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Дата</label>
@@ -261,11 +263,11 @@
                         <input type="hidden" id="vaccineAnimalId">
                         <div class="mb-3">
                             <label class="form-label">Название вакцины</label>
-                            <input type="text" class="form-control" id="vaccineName" required placeholder="Например, Нобивак">
+                            <input type="text" class="form-control" id="vaccineName" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Ветеринар</label>
-                            <input type="text" class="form-control" id="vaccineVeterinarian" required placeholder="Кто проводил вакцинацию">
+                            <input type="text" class="form-control" id="vaccineVeterinarian" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Дата прививки</label>
@@ -298,19 +300,19 @@
                         <input type="hidden" id="dietAnimalId">
                         <div class="mb-3">
                             <label class="form-label">Название рациона</label>
-                            <input type="text" class="form-control" id="dietName" required placeholder="Например, Летний рацион">
+                            <input type="text" class="form-control" id="dietName" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Тип корма</label>
-                            <input type="text" class="form-control" id="foodType" required placeholder="Сено, овощи, мясо, комбикорм">
+                            <input type="text" class="form-control" id="foodType" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Количество</label>
-                            <input type="text" class="form-control" id="quantity" required placeholder="например, 2 кг, 500 г, 1 ведро">
+                            <input type="text" class="form-control" id="quantity" required>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Расписание</label>
-                            <input type="text" class="form-control" id="schedule" placeholder="например, дважды в день, утром и вечером">
+                            <input type="text" class="form-control" id="schedule">
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Дата начала</label>
@@ -435,15 +437,15 @@
                 <div class="modal-body">
                     <form id="changeCredentialsForm">
                         <div class="mb-3">
-                            <label class="form-label">Новый логин (оставьте пустым, если не хотите менять)</label>
+                            <label class="form-label">Новый логин</label>
                             <input type="text" class="form-control" id="newUsername">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Новый пароль (оставьте пустым, если не хотите менять)</label>
+                            <label class="form-label">Новый пароль</label>
                             <input type="password" class="form-control" id="newPassword">
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Подтверждение нового пароля</label>
+                            <label class="form-label">Подтверждение пароля</label>
                             <input type="password" class="form-control" id="confirmNewPassword">
                         </div>
                     </form>
@@ -456,7 +458,7 @@
         </div>
     </div>
 
-    <!-- Модальное окно напоминаний (скрытое, используется для отображения) -->
+    <!-- Модальное окно напоминаний -->
     <div class="modal fade" id="remindersModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -466,6 +468,82 @@
                 </div>
                 <div class="modal-body">
                     <div id="remindersList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно планирования осмотра -->
+    <div class="modal fade" id="scheduleExamModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">📅 Запланировать осмотр</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="scheduleExamForm">
+                        <div class="mb-3">
+                            <label class="form-label">Ветеринар</label>
+                            <input type="text" class="form-control" id="scheduleVeterinarian" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Предполагаемый диагноз</label>
+                            <input type="text" class="form-control" id="scheduleDiagnosis" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Планируемое лечение</label>
+                            <textarea class="form-control" id="scheduleTreatment" rows="2" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Дата и время</label>
+                            <input type="datetime-local" class="form-control" id="scheduleExamDate" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Примечания</label>
+                            <textarea class="form-control" id="scheduleNotes" rows="2"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-warning" onclick="addScheduledExamination()">Запланировать</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно планирования прививки -->
+    <div class="modal fade" id="scheduleVaccineModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">📅 Запланировать прививку</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="scheduleVaccineForm">
+                        <div class="mb-3">
+                            <label class="form-label">Название вакцины</label>
+                            <input type="text" class="form-control" id="scheduleVaccineName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Ветеринар</label>
+                            <input type="text" class="form-control" id="scheduleVaccineVeterinarian" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Плановая дата</label>
+                            <input type="date" class="form-control" id="scheduleVaccineDate" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Плановая следующая прививка</label>
+                            <input type="date" class="form-control" id="scheduleNextVaccineDate">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-warning" onclick="addScheduledVaccination()">Запланировать</button>
                 </div>
             </div>
         </div>

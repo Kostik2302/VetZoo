@@ -1,12 +1,11 @@
 import sys
 import os
-from flask import Flask, request, jsonify, send_from_directory, render_template, redirect, url_for, flash
+from flask import Flask, request, jsonify, render_template, redirect, url_for, flash
 from flask_cors import CORS
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from functools import wraps
-import json
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from database.database import Database
@@ -18,7 +17,6 @@ app = Flask(__name__,
             static_url_path='',
             template_folder=os.path.join(BASE_DIR, 'templates'))
 app.secret_key = 'super-secret-key-vetzoo'
-# Настройка CORS для работы с куками
 CORS(app, supports_credentials=True, origins=['http://localhost:5000'])
 
 db = Database()
@@ -26,7 +24,6 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# ----- Модель пользователя для Flask-Login -----
 class User(UserMixin):
     def __init__(self, user_id, username, role, full_name):
         self.id = user_id
@@ -46,7 +43,6 @@ def load_user(user_id):
         )
     return None
 
-# ----- Декоратор для проверки ролей -----
 def role_required(*roles):
     def decorator(f):
         @wraps(f)
@@ -59,7 +55,6 @@ def role_required(*roles):
         return decorated_function
     return decorator
 
-# ----- Создание администратора по умолчанию -----
 def create_default_admin():
     admin = db.get_user_by_username('admin')
     if not admin:
@@ -67,7 +62,6 @@ def create_default_admin():
         db.create_user('admin', pwd_hash, 'admin', 'Default Admin')
         print("✅ Администратор по умолчанию создан: admin / admin")
 
-# ----- СТРАНИЦЫ -----
 @app.route('/')
 @login_required
 def index():
@@ -114,7 +108,6 @@ def admin_panel():
 def reports_panel():
     return render_template('reports.html')
 
-# ----- API: текущий пользователь -----
 @app.route('/api/me', methods=['GET'])
 @login_required
 def get_current_user():
@@ -125,11 +118,9 @@ def get_current_user():
         'full_name': current_user.full_name
     })
 
-# ----- API: смена логина/пароля -----
 @app.route('/api/user/change-credentials', methods=['PUT'])
 @login_required
 def change_credentials():
-    """Смена логина и/или пароля для текущего пользователя"""
     data = request.json
     new_username = data.get('new_username')
     new_password = data.get('new_password')
@@ -161,7 +152,6 @@ def change_credentials():
     
     return jsonify({'message': 'Данные успешно обновлены'})
 
-# ----- API: управление пользователями (только admin) -----
 @app.route('/api/users', methods=['GET'])
 @login_required
 @role_required('admin')
@@ -216,7 +206,6 @@ def delete_user(user_id):
 @login_required
 @role_required('admin')
 def update_user_fullname(user_id):
-    """Обновление полного имени пользователя"""
     data = request.json
     new_full_name = data.get('full_name')
     
@@ -228,9 +217,6 @@ def update_user_fullname(user_id):
         return jsonify({'message': 'Полное имя обновлено'})
     return jsonify({'error': 'Пользователь не найден'}), 404
 
-# ==================== ЖИВОТНЫЕ ====================
-
-# Получить всех животных
 @app.route('/api/animals', methods=['GET'])
 @login_required
 def get_animals():
@@ -247,7 +233,6 @@ def get_animals():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Получить одно животное по ID
 @app.route('/api/animals/<int:animal_id>', methods=['GET'])
 @login_required
 def get_animal(animal_id):
@@ -263,7 +248,6 @@ def get_animal(animal_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Добавить новое животное (только vet)
 @app.route('/api/animals', methods=['POST'])
 @login_required
 @role_required('vet')
@@ -283,7 +267,6 @@ def add_animal():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Обновить данные животного (только vet)
 @app.route('/api/animals/<int:animal_id>', methods=['PUT'])
 @login_required
 @role_required('vet')
@@ -312,7 +295,6 @@ def update_animal(animal_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Обновить только статус здоровья (только vet)
 @app.route('/api/animals/<int:animal_id>/status', methods=['PUT'])
 @login_required
 @role_required('vet')
@@ -326,9 +308,6 @@ def update_animal_status(animal_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# ==================== ОСМОТРЫ ====================
-
-# Получить все осмотры животного
 @app.route('/api/animals/<int:animal_id>/examinations', methods=['GET'])
 @login_required
 def get_examinations(animal_id):
@@ -336,15 +315,24 @@ def get_examinations(animal_id):
         exams = db.get_animal_examinations(animal_id)
         result = []
         for e in exams:
+            is_scheduled = 0
+            if len(e) > 7:
+                is_scheduled = e[7] if e[7] is not None else 0
+                
             result.append({
-                'id': e[0], 'animal_id': e[1], 'examination_date': e[2],
-                'veterinarian': e[3], 'diagnosis': e[4], 'treatment': e[5], 'notes': e[6]
+                'id': e[0], 
+                'animal_id': e[1], 
+                'examination_date': e[2],
+                'veterinarian': e[3], 
+                'diagnosis': e[4], 
+                'treatment': e[5], 
+                'notes': e[6],
+                'is_scheduled': is_scheduled
             })
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Добавить осмотр (только vet)
 @app.route('/api/examinations', methods=['POST'])
 @login_required
 @role_required('vet')
@@ -354,21 +342,46 @@ def add_examination():
         animal = db.get_animal(data['animal_id'])
         if not animal:
             return jsonify({'error': 'Животное не найдено'}), 404
+        
+        is_scheduled = data.get('is_scheduled', False)
+        
         exam_id = db.add_examination(
             data['animal_id'],
             data.get('examination_date', datetime.now().strftime('%Y-%m-%d %H:%M')),
             data['veterinarian'],
             data['diagnosis'],
             data['treatment'],
-            data.get('notes')
+            data.get('notes'),
+            1 if is_scheduled else 0
         )
         return jsonify({'id': exam_id, 'message': 'Осмотр добавлен'}), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# ==================== ПРИВИВКИ ====================
+@app.route('/api/examinations/<int:exam_id>/complete', methods=['PUT'])
+@login_required
+@role_required('vet')
+def complete_examination(exam_id):
+    try:
+        success = db.complete_examination(exam_id)
+        if success:
+            return jsonify({'message': 'Осмотр отмечен как проведенный'})
+        return jsonify({'error': 'Осмотр не найден'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-# Получить все прививки животного
+@app.route('/api/examinations/<int:exam_id>', methods=['DELETE'])
+@login_required
+@role_required('vet')
+def delete_examination(exam_id):
+    try:
+        success = db.delete_examination(exam_id)
+        if success:
+            return jsonify({'message': 'Осмотр удален'})
+        return jsonify({'error': 'Осмотр не найден'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/animals/<int:animal_id>/vaccinations', methods=['GET'])
 @login_required
 def get_vaccinations(animal_id):
@@ -376,15 +389,23 @@ def get_vaccinations(animal_id):
         vaccines = db.get_animal_vaccinations(animal_id)
         result = []
         for v in vaccines:
+            is_scheduled = 0
+            if len(v) > 6:
+                is_scheduled = v[6] if v[6] is not None else 0
+                
             result.append({
-                'id': v[0], 'animal_id': v[1], 'vaccination_date': v[2],
-                'vaccine_name': v[3], 'veterinarian': v[4], 'next_due_date': v[5]
+                'id': v[0], 
+                'animal_id': v[1], 
+                'vaccination_date': v[2],
+                'vaccine_name': v[3], 
+                'veterinarian': v[4], 
+                'next_due_date': v[5],
+                'is_scheduled': is_scheduled
             })
         return jsonify(result)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Добавить прививку (только vet)
 @app.route('/api/vaccinations', methods=['POST'])
 @login_required
 @role_required('vet')
@@ -394,20 +415,45 @@ def add_vaccination():
         animal = db.get_animal(data['animal_id'])
         if not animal:
             return jsonify({'error': 'Животное не найдено'}), 404
+        
+        is_scheduled = data.get('is_scheduled', False)
+        
         vacc_id = db.add_vaccination(
             data['animal_id'],
             data.get('vaccination_date', datetime.now().strftime('%Y-%m-%d')),
             data['vaccine_name'],
             data['veterinarian'],
-            data.get('next_due_date')
+            data.get('next_due_date'),
+            1 if is_scheduled else 0
         )
         return jsonify({'id': vacc_id, 'message': 'Прививка добавлена'}), 201
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# ==================== РАЦИОНЫ ====================
+@app.route('/api/vaccinations/<int:vacc_id>/complete', methods=['PUT'])
+@login_required
+@role_required('vet')
+def complete_vaccination(vacc_id):
+    try:
+        success = db.complete_vaccination(vacc_id)
+        if success:
+            return jsonify({'message': 'Прививка отмечена как проведенная'})
+        return jsonify({'error': 'Прививка не найдена'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-# Получить все рационы животного
+@app.route('/api/vaccinations/<int:vacc_id>', methods=['DELETE'])
+@login_required
+@role_required('vet')
+def delete_vaccination(vacc_id):
+    try:
+        success = db.delete_vaccination(vacc_id)
+        if success:
+            return jsonify({'message': 'Прививка удалена'})
+        return jsonify({'error': 'Прививка не найдена'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/animals/<int:animal_id>/diets', methods=['GET'])
 @login_required
 def get_diets(animal_id):
@@ -423,7 +469,6 @@ def get_diets(animal_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Добавить рацион (только vet)
 @app.route('/api/diets', methods=['POST'])
 @login_required
 @role_required('vet')
@@ -446,7 +491,6 @@ def add_diet():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Удалить рацион (только vet)
 @app.route('/api/diets/<int:diet_id>', methods=['DELETE'])
 @login_required
 @role_required('vet')
@@ -459,7 +503,141 @@ def delete_diet(diet_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# ==================== РАСПИСАНИЕ И НАПОМИНАНИЯ ====================
+@app.route('/api/animals/<int:animal_id>/upcoming-procedures', methods=['GET'])
+@login_required
+def get_animal_upcoming_procedures(animal_id):
+    try:
+        animal = db.get_animal(animal_id)
+        if not animal:
+            return jsonify({'error': 'Животное не найдено'}), 404
+        
+        result = []
+        today = datetime.now().date()
+
+        animal_name = animal[1]
+        animal_species = animal[2]
+        
+        # Обработка осмотров
+        exams = db.get_animal_examinations(animal_id)
+        
+        for exam in exams:
+            try:
+                is_scheduled = 0
+                if len(exam) > 7 and exam[7] is not None:
+                    is_scheduled = exam[7]
+
+                exam_date_str = exam[2]
+                if 'T' in exam_date_str:
+                    exam_date_str = exam_date_str.split('T')[0]
+                elif ' ' in exam_date_str:
+                    exam_date_str = exam_date_str.split(' ')[0]
+                
+                print(f"Осмотр ID {exam[0]}, is_scheduled: {is_scheduled}, дата: {exam_date_str}")
+
+                if is_scheduled == 1:
+                    exam_date = datetime.strptime(exam_date_str, '%Y-%m-%d').date()
+                    days_until = (exam_date - today).days
+                    
+                    description = f'{exam[4]}'
+                    if days_until < 0:
+                        description += f" (просрочен на {abs(days_until)} дн.)"
+                    
+                    result.append({
+                        'type': 'examination',
+                        'date': exam[2],
+                        'description': description,
+                        'animal_id': animal_id,
+                        'animal_name': animal_name,
+                        'animal_species': animal_species,
+                        'is_scheduled': True,
+                        'procedure_id': exam[0],
+                        'days_until': days_until,
+                        'status': 'scheduled'
+                    })
+                    print(f"Добавлен запланированный осмотр в результат")
+            except Exception as e:
+                print(f"Ошибка обработки осмотра: {e}")
+                pass
+        
+        # Обработка прививок
+        vaccines = db.get_animal_vaccinations(animal_id)
+        print(f"Найдено прививок: {len(vaccines)}")
+        
+        for vaccine in vaccines:
+            try:
+                is_scheduled = 0
+                if len(vaccine) > 6 and vaccine[6] is not None:
+                    is_scheduled = vaccine[6]
+                
+                if is_scheduled == 1:
+                    try:
+                        vaccine_date_str = vaccine[2]
+                        if 'T' in vaccine_date_str:
+                            vaccine_date_str = vaccine_date_str.split('T')[0]
+                        
+                        planned_date = datetime.strptime(vaccine_date_str, '%Y-%m-%d').date()
+                        days_until = (planned_date - today).days
+                        
+                        description = f'{vaccine[3]} (запланирована)'
+                        if days_until < 0:
+                            description += f" ⚠️ просрочена на {abs(days_until)} дн."
+                        
+                        result.append({
+                            'type': 'vaccination',
+                            'date': vaccine[2],
+                            'description': description,
+                            'animal_id': animal_id,
+                            'animal_name': animal_name,
+                            'animal_species': animal_species,
+                            'is_scheduled': True,
+                            'procedure_id': vaccine[0],
+                            'days_until': days_until,
+                            'status': 'scheduled'
+                        })
+                    except Exception as e:
+                        print(f"Ошибка обработки запланированной прививки: {e}")
+                        pass
+                else:
+                    if vaccine[5]:
+                        try:
+                            due_date_str = vaccine[5]
+                            if 'T' in due_date_str:
+                                due_date_str = due_date_str.split('T')[0]
+                            
+                            due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date()
+                            days_until = (due_date - today).days
+                            
+                            if days_until >= -30:
+                                description = f'Ревакцинация: {vaccine[3]}'
+                                if days_until < 0:
+                                    description += f" ⚠️ просрочена на {abs(days_until)} дн."
+                                
+                                result.append({
+                                    'type': 'vaccination',
+                                    'date': vaccine[5],
+                                    'description': description,
+                                    'animal_id': animal_id,
+                                    'animal_name': animal_name,
+                                    'animal_species': animal_species,
+                                    'is_scheduled': False,
+                                    'procedure_id': vaccine[0],
+                                    'days_until': days_until,
+                                    'status': 'upcoming' if days_until > 0 else 'overdue'
+                                })
+                        except Exception as e:
+                            print(f"Ошибка обработки ревакцинации: {e}")
+                            pass
+            except Exception as e:
+                print(f"Ошибка обработки прививки: {e}")
+                pass
+        
+        print(f"Итоговый результат: {len(result)} процедур")
+        result.sort(key=lambda x: x['date'])
+        return jsonify(result)
+    except Exception as e:
+        print(f"Ошибка в get_animal_upcoming_procedures: {e}")
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/schedule/upcoming', methods=['GET'])
 @login_required
@@ -474,90 +652,114 @@ def get_upcoming_schedule():
             animal_name = animal[1]
             animal_species = animal[2]
             
-            # Получаем осмотры
+            # Обработка осмотров
             exams = db.get_animal_examinations(animal_id)
             for exam in exams:
                 try:
-                    exam_date = datetime.strptime(exam[2].split()[0], '%Y-%m-%d').date()
-                    if exam_date >= today:
+                    is_scheduled = 0
+                    if len(exam) > 7 and exam[7] is not None:
+                        is_scheduled = exam[7]
+
+                    exam_date_str = exam[2]
+                    if 'T' in exam_date_str:
+                        exam_date_str = exam_date_str.split('T')[0]
+                    elif ' ' in exam_date_str:
+                        exam_date_str = exam_date_str.split(' ')[0]
+
+                    if is_scheduled == 1:
+                        exam_date = datetime.strptime(exam_date_str, '%Y-%m-%d').date()
+                        days_until = (exam_date - today).days
+                        
+                        description = f'{exam[4]}'
+                        if days_until < 0:
+                            description += f" (просрочен на {abs(days_until)} дн.)"
+                        
                         result.append({
                             'type': 'examination',
                             'date': exam[2],
-                            'description': f'Осмотр: {exam[4]}',
+                            'description': description,
                             'animal_id': animal_id,
                             'animal_name': animal_name,
-                            'animal_species': animal_species
+                            'animal_species': animal_species,
+                            'is_scheduled': True,
+                            'procedure_id': exam[0],
+                            'days_until': days_until
                         })
-                except:
+                except Exception as e:
+                    print(f"Ошибка обработки осмотра: {e}")
                     pass
             
-            # Получаем прививки с датами следующих
+            # Обработка прививок
             vaccines = db.get_animal_vaccinations(animal_id)
             for vaccine in vaccines:
-                if vaccine[5]:  # next_due_date
-                    try:
-                        due_date = datetime.strptime(vaccine[5], '%Y-%m-%d').date()
-                        if due_date >= today:
+                try:
+                    is_scheduled = 0
+                    if len(vaccine) > 6 and vaccine[6] is not None:
+                        is_scheduled = vaccine[6]
+                    
+                    if is_scheduled == 1:
+                        try:
+                            vaccine_date_str = vaccine[2]
+                            if 'T' in vaccine_date_str:
+                                vaccine_date_str = vaccine_date_str.split('T')[0]
+                            
+                            planned_date = datetime.strptime(vaccine_date_str, '%Y-%m-%d').date()
+                            days_until = (planned_date - today).days
+                            
+                            description = f'Вакцинация: {vaccine[3]} (запланирована)'
+                            if days_until < 0:
+                                description += f" ⚠️ Просрочена на {abs(days_until)} дн."
+                            
                             result.append({
                                 'type': 'vaccination',
-                                'date': vaccine[5],
-                                'description': f'Вакцинация: {vaccine[3]}',
+                                'date': vaccine[2],
+                                'description': description,
                                 'animal_id': animal_id,
                                 'animal_name': animal_name,
-                                'animal_species': animal_species
+                                'animal_species': animal_species,
+                                'is_scheduled': True,
+                                'procedure_id': vaccine[0],
+                                'days_until': days_until
                             })
-                    except:
-                        pass
-        
-        # Сортируем по дате
-        result.sort(key=lambda x: x['date'])
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/animals/<int:animal_id>/upcoming-procedures', methods=['GET'])
-@login_required
-def get_animal_upcoming_procedures(animal_id):
-    try:
-        animal = db.get_animal(animal_id)
-        if not animal:
-            return jsonify({'error': 'Животное не найдено'}), 404
-        
-        result = []
-        today = datetime.now().date()
-        
-        # Получаем осмотры
-        exams = db.get_animal_examinations(animal_id)
-        for exam in exams:
-            try:
-                exam_date = datetime.strptime(exam[2].split()[0], '%Y-%m-%d').date()
-                if exam_date >= today:
-                    result.append({
-                        'type': 'examination',
-                        'date': exam[2],
-                        'description': f'{exam[4]}'
-                    })
-            except:
-                pass
-        
-        # Получаем прививки с датами следующих
-        vaccines = db.get_animal_vaccinations(animal_id)
-        for vaccine in vaccines:
-            if vaccine[5]:  # next_due_date
-                try:
-                    due_date = datetime.strptime(vaccine[5], '%Y-%m-%d').date()
-                    if due_date >= today:
-                        result.append({
-                            'type': 'vaccination',
-                            'date': vaccine[5],
-                            'description': f'{vaccine[3]}'
-                        })
-                except:
+                        except Exception as e:
+                            print(f"Ошибка обработки запланированной прививки: {e}")
+                            pass
+                    else:
+                        if vaccine[5]:
+                            try:
+                                due_date_str = vaccine[5]
+                                if 'T' in due_date_str:
+                                    due_date_str = due_date_str.split('T')[0]
+                                
+                                due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date()
+                                days_until = (due_date - today).days
+                                
+                                description = f'Ревакцинация: {vaccine[3]}'
+                                if days_until < 0:
+                                    description += f" ⚠️ Просрочена на {abs(days_until)} дн."
+                                
+                                result.append({
+                                    'type': 'vaccination',
+                                    'date': vaccine[5],
+                                    'description': description,
+                                    'animal_id': animal_id,
+                                    'animal_name': animal_name,
+                                    'animal_species': animal_species,
+                                    'is_scheduled': False,
+                                    'procedure_id': vaccine[0],
+                                    'days_until': days_until
+                                })
+                            except Exception as e:
+                                print(f"Ошибка обработки ревакцинации: {e}")
+                                pass
+                except Exception as e:
+                    print(f"Ошибка обработки прививки: {e}")
                     pass
         
         result.sort(key=lambda x: x['date'])
         return jsonify(result)
     except Exception as e:
+        print(f"Ошибка в get_upcoming_schedule: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/reminders', methods=['GET'])
@@ -573,34 +775,55 @@ def get_reminders():
             animal_name = animal[1]
             animal_species = animal[2]
             
-            # Проверяем прививки
             vaccines = db.get_animal_vaccinations(animal_id)
             for vaccine in vaccines:
-                if vaccine[5]:  # next_due_date
+                is_scheduled = vaccine[6] if len(vaccine) > 6 and vaccine[6] == 1 else 0
+                
+                if is_scheduled:
                     try:
-                        due_date = datetime.strptime(vaccine[5], '%Y-%m-%d').date()
-                        days_until = (due_date - today).days
+                        planned_date = datetime.strptime(vaccine[2], '%Y-%m-%d').date()
+                        days_until = (planned_date - today).days
                         
-                        if days_until <= 7:  # Напоминаем за 7 дней
+                        if -3 <= days_until <= 7:
                             reminders.append({
                                 'type': 'vaccination',
-                                'date': vaccine[5],
-                                'description': f'Прививка: {vaccine[3]}',
+                                'date': vaccine[2],
+                                'description': f'Запланированная прививка: {vaccine[3]}',
                                 'animal_id': animal_id,
                                 'animal_name': animal_name,
                                 'animal_species': animal_species,
-                                'days_until': days_until
+                                'days_until': days_until,
+                                'is_scheduled': True
                             })
                     except:
                         pass
+                else:
+                    if vaccine[5]:
+                        try:
+                            due_date = datetime.strptime(vaccine[5], '%Y-%m-%d').date()
+                            days_until = (due_date - today).days
+                            
+                            if days_until <= 7:
+                                reminders.append({
+                                    'type': 'vaccination',
+                                    'date': vaccine[5],
+                                    'description': f'Прививка: {vaccine[3]}',
+                                    'animal_id': animal_id,
+                                    'animal_name': animal_name,
+                                    'animal_species': animal_species,
+                                    'days_until': days_until,
+                                    'is_scheduled': False
+                                })
+                        except:
+                            pass
             
-            # Проверяем осмотры
             exams = db.get_animal_examinations(animal_id)
             for exam in exams:
                 try:
                     exam_date = datetime.strptime(exam[2].split()[0], '%Y-%m-%d').date()
                     days_until = (exam_date - today).days
-                    if 0 <= days_until <= 7:
+                    if -3 <= days_until <= 7:
+                        is_scheduled = exam[7] if len(exam) > 7 and exam[7] == 1 else 0
                         reminders.append({
                             'type': 'examination',
                             'date': exam[2],
@@ -608,18 +831,16 @@ def get_reminders():
                             'animal_id': animal_id,
                             'animal_name': animal_name,
                             'animal_species': animal_species,
-                            'days_until': days_until
+                            'days_until': days_until,
+                            'is_scheduled': is_scheduled
                         })
                 except:
                     pass
         
-        # Сортируем по срочности
         reminders.sort(key=lambda x: (x['days_until'] > 0, x['days_until']))
         return jsonify(reminders)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-# ==================== АНАЛИТИЧЕСКИЕ ОТЧЕТЫ ====================
 
 @app.route('/api/reports/health-status', methods=['GET'])
 @login_required
@@ -632,8 +853,8 @@ def get_health_status_report():
         species_stats = {}
         
         for animal in animals:
-            status = animal[7]  # health_status
-            species = animal[2]  # species
+            status = animal[7]
+            species = animal[2]
             
             status_counts[status] = status_counts.get(status, 0) + 1
             
@@ -665,7 +886,8 @@ def get_vaccination_report():
             'vaccines_by_type': {},
             'animals_without_vaccinations': [],
             'vaccination_coverage': 0,
-            'vaccinations_by_month': {}
+            'vaccinations_by_month': {},
+            'scheduled_vaccinations': 0
         }
         
         animals_with_vaccines = 0
@@ -685,7 +907,9 @@ def get_vaccination_report():
                     vaccine_name = vaccine[3]
                     report['vaccines_by_type'][vaccine_name] = report['vaccines_by_type'].get(vaccine_name, 0) + 1
                     
-                    if vaccine[5]:  # next_due_date
+                    is_scheduled = vaccine[6] if len(vaccine) > 6 and vaccine[6] == 1 else 0
+                    
+                    if vaccine[5] and not is_scheduled:
                         try:
                             due_date = datetime.strptime(vaccine[5], '%Y-%m-%d').date()
                             if due_date < today:
@@ -695,12 +919,16 @@ def get_vaccination_report():
                         except:
                             pass
                     
-                    try:
-                        vac_date = datetime.strptime(vaccine[2], '%Y-%m-%d').date()
-                        month_key = vac_date.strftime('%Y-%m')
-                        report['vaccinations_by_month'][month_key] = report['vaccinations_by_month'].get(month_key, 0) + 1
-                    except:
-                        pass
+                    if not is_scheduled:
+                        try:
+                            vac_date = datetime.strptime(vaccine[2], '%Y-%m-%d').date()
+                            month_key = vac_date.strftime('%Y-%m')
+                            report['vaccinations_by_month'][month_key] = report['vaccinations_by_month'].get(month_key, 0) + 1
+                        except:
+                            pass
+                    
+                    if is_scheduled:
+                        report['scheduled_vaccinations'] += 1
             else:
                 report['animals_without_vaccinations'].append({
                     'id': animal_id,
@@ -730,7 +958,8 @@ def get_examinations_report():
             'common_diagnoses': {},
             'animals_without_examinations': [],
             'recent_examinations': 0,
-            'examinations_by_month': {}
+            'examinations_by_month': {},
+            'scheduled_examinations': 0
         }
         
         animals_with_exams = 0
@@ -749,18 +978,25 @@ def get_examinations_report():
                 for exam in exams:
                     vet = exam[3]
                     diagnosis = exam[4]
+                    
+                    is_scheduled = exam[7] if len(exam) > 7 and exam[7] == 1 else 0
+                    
                     try:
                         exam_date = datetime.strptime(exam[2].split()[0], '%Y-%m-%d').date()
                         
                         report['examinations_by_vet'][vet] = report['examinations_by_vet'].get(vet, 0) + 1
                         report['common_diagnoses'][diagnosis] = report['common_diagnoses'].get(diagnosis, 0) + 1
                         
-                        if exam_date >= three_months_ago:
+                        if not is_scheduled and exam_date >= three_months_ago:
                             report['recent_examinations'] += 1
                         
-                        month_key = exam_date.strftime('%Y-%m')
-                        report['examinations_by_month'][month_key] = report['examinations_by_month'].get(month_key, 0) + 1
-                    except:
+                        if not is_scheduled:
+                            month_key = exam_date.strftime('%Y-%m')
+                            report['examinations_by_month'][month_key] = report['examinations_by_month'].get(month_key, 0) + 1
+                        
+                        if is_scheduled:
+                            report['scheduled_examinations'] += 1
+                    except Exception as e:
                         pass
             else:
                 report['animals_without_examinations'].append({
@@ -769,7 +1005,6 @@ def get_examinations_report():
                     'species': animal_species
                 })
         
-        # Сортируем диагнозы по частоте
         sorted_diagnoses = sorted(report['common_diagnoses'].items(), key=lambda x: x[1], reverse=True)[:10]
         report['common_diagnoses'] = dict(sorted_diagnoses)
         

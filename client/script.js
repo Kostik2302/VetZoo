@@ -4,7 +4,6 @@ let currentAnimalId = null;
 let currentUserRole = null;
 let reminderInterval = null;
 
-// Функция для перевода роли на русский
 function translateRole(role) {
     const roles = {
         'admin': 'администратор',
@@ -14,7 +13,6 @@ function translateRole(role) {
     return roles[role] || role;
 }
 
-// Проверка авторизации и получение роли
 async function checkAuth() {
     try {
         const response = await fetch(`${API_URL}/me`, {
@@ -37,7 +35,6 @@ async function checkAuth() {
     }
 }
 
-// Обновление интерфейса в зависимости от роли
 function updateUIBasedOnRole() {
     const isVet = currentUserRole === 'vet';
     const isAdmin = currentUserRole === 'admin';
@@ -49,7 +46,6 @@ function updateUIBasedOnRole() {
     document.getElementById('reportsBtn').style.display = (isAdmin || isVet) ? 'inline-block' : 'none';
 }
 
-// Загрузка всех животных
 async function loadAnimals() {
     try {
         const response = await fetch(`${API_URL}/animals`, {
@@ -63,7 +59,6 @@ async function loadAnimals() {
     }
 }
 
-// Отображение животных в карточках
 function displayAnimals(animals) {
     const container = document.getElementById('animalsList');
     container.innerHTML = '';
@@ -92,7 +87,6 @@ function displayAnimals(animals) {
     });
 }
 
-// Просмотр деталей животного
 async function viewAnimal(id) {
     try {
         currentAnimalId = id;
@@ -129,6 +123,8 @@ async function viewAnimal(id) {
         document.getElementById('addExamBtn').style.display = isVet ? 'inline-block' : 'none';
         document.getElementById('addVaccineBtn').style.display = isVet ? 'inline-block' : 'none';
         document.getElementById('addDietBtn').style.display = isVet ? 'inline-block' : 'none';
+        document.getElementById('scheduleExamBtn').style.display = isVet ? 'inline-block' : 'none';
+        document.getElementById('scheduleVaccineBtn').style.display = isVet ? 'inline-block' : 'none';
         
         if (currentAnimalModal) {
             currentAnimalModal.hide();
@@ -140,7 +136,6 @@ async function viewAnimal(id) {
     }
 }
 
-// Загрузка осмотров
 async function loadExaminations(animalId) {
     const response = await fetch(`${API_URL}/animals/${animalId}/examinations`, {
         credentials: 'include'
@@ -153,18 +148,39 @@ async function loadExaminations(animalId) {
         return;
     }
     
-    container.innerHTML = exams.map(exam => `
+    container.innerHTML = exams.map(exam => {
+        const isScheduled = exam.is_scheduled === 1;
+        const statusBadge = isScheduled ? '<span class="badge bg-warning ms-2">Запланирован</span>' : '';
+        
+        const examDate = new Date(exam.examination_date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        let dateClass = '';
+        if (isScheduled && examDate < today) {
+            dateClass = 'text-danger fw-bold';
+        }
+        
+        return `
         <div class="timeline-item">
-            <div class="timeline-date">${exam.examination_date}</div>
-            <div><strong>Ветеринар:</strong> ${exam.veterinarian}</div>
-            <div><strong>Диагноз:</strong> ${exam.diagnosis}</div>
-            <div><strong>Лечение:</strong> ${exam.treatment}</div>
-            ${exam.notes ? `<div><small>${exam.notes}</small></div>` : ''}
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="timeline-date ${dateClass}">${exam.examination_date} ${statusBadge}</div>
+                    <div><strong>Ветеринар:</strong> ${exam.veterinarian}</div>
+                    <div><strong>Диагноз:</strong> ${exam.diagnosis}</div>
+                    <div><strong>Лечение:</strong> ${exam.treatment}</div>
+                    ${exam.notes ? `<div><small>${exam.notes}</small></div>` : ''}
+                </div>
+                ${currentUserRole === 'vet' && isScheduled ? `
+                    <div>
+                        <button class="btn btn-sm btn-success" onclick="markExaminationCompleted(${exam.id}, ${animalId})">✓ Проведен</button>
+                    </div>
+                ` : ''}
+            </div>
         </div>
-    `).join('');
+    `}).join('');
 }
 
-// Загрузка прививок
 async function loadVaccinations(animalId) {
     const response = await fetch(`${API_URL}/animals/${animalId}/vaccinations`, {
         credentials: 'include'
@@ -178,25 +194,64 @@ async function loadVaccinations(animalId) {
     }
     
     container.innerHTML = vaccines.map(v => {
-        const isOverdue = v.next_due_date && new Date(v.next_due_date) < new Date();
-        const overdueClass = isOverdue ? 'text-danger fw-bold' : '';
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const isScheduled = v.is_scheduled === 1;
+        const statusBadge = isScheduled ? '<span class="badge bg-warning ms-2">Запланирована</span>' : '';
+        
+        let overdueClass = '';
+        let overdueText = '';
+        
+        if (isScheduled) {
+            const plannedDate = new Date(v.vaccination_date);
+            if (plannedDate < today) {
+                overdueClass = 'text-danger fw-bold';
+                overdueText = ' ⚠️ Просрочена!';
+            }
+        } else {
+            if (v.next_due_date) {
+                const nextDate = new Date(v.next_due_date);
+                if (nextDate < today) {
+                    overdueClass = 'text-danger fw-bold';
+                    overdueText = ' ⚠️ Просрочена!';
+                }
+            }
+        }
         
         return `
         <div class="timeline-item">
-            <div class="timeline-date">${v.vaccination_date}</div>
-            <div><strong>Вакцина:</strong> ${v.vaccine_name}</div>
-            <div><strong>Ветеринар:</strong> ${v.veterinarian}</div>
-            ${v.next_due_date ? `
-                <div class="${overdueClass}">
-                    <strong>Следующая:</strong> ${v.next_due_date}
-                    ${isOverdue ? ' ⚠️ Просрочена!' : ''}
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="timeline-date">
+                        ${isScheduled ? '📅 План: ' + v.vaccination_date : '📋 Проведена: ' + v.vaccination_date}
+                        ${statusBadge}
+                    </div>
+                    <div><strong>Вакцина:</strong> ${v.vaccine_name}</div>
+                    <div><strong>Ветеринар:</strong> ${v.veterinarian}</div>
+                    ${!isScheduled && v.next_due_date ? `
+                        <div class="${overdueClass}">
+                            <strong>Следующая:</strong> ${v.next_due_date}${overdueText}
+                        </div>
+                    ` : ''}
+                    ${isScheduled ? `
+                        <div class="${overdueClass}">
+                            <strong>Статус:</strong> Ожидает проведения${overdueText}
+                        </div>
+                    ` : ''}
                 </div>
-            ` : ''}
+                ${currentUserRole === 'vet' && isScheduled ? `
+                    <div>
+                        <button class="btn btn-sm btn-success" onclick="markVaccinationCompleted(${v.id}, ${animalId})">
+                            ✓ Отметить проведенной
+                        </button>
+                    </div>
+                ` : ''}
+            </div>
         </div>
     `}).join('');
 }
 
-// Загрузка рационов
 async function loadDiets(animalId) {
     const response = await fetch(`${API_URL}/animals/${animalId}/diets`, {
         credentials: 'include'
@@ -229,51 +284,93 @@ async function loadDiets(animalId) {
     `).join('');
 }
 
-// Загрузка предстоящих процедур для конкретного животного
 async function loadUpcomingProcedures(animalId) {
-    const response = await fetch(`${API_URL}/animals/${animalId}/upcoming-procedures`, {
-        credentials: 'include'
-    });
-    const procedures = await response.json();
-    
-    const container = document.getElementById('upcomingProceduresList');
-    if (procedures.length === 0) {
-        container.innerHTML = '<p class="text-muted">Нет предстоящих процедур</p>';
-        return;
-    }
-    
-    container.innerHTML = procedures.map(p => {
-        const daysUntil = Math.ceil((new Date(p.date) - new Date()) / (1000 * 60 * 60 * 24));
-        let urgencyClass = '';
-        let urgencyText = '';
+    try {
+        const response = await fetch(`${API_URL}/animals/${animalId}/upcoming-procedures`, {
+            credentials: 'include'
+        });
         
-        if (daysUntil <= 0) {
-            urgencyClass = 'text-danger fw-bold';
-            urgencyText = '⚠️ Просрочено!';
-        } else if (daysUntil <= 3) {
-            urgencyClass = 'text-warning fw-bold';
-            urgencyText = '⚠️ Скоро!';
-        } else if (daysUntil <= 7) {
-            urgencyClass = 'text-info';
-            urgencyText = 'ℹ️ На этой неделе';
+        if (!response.ok) {
+            throw new Error('Ошибка загрузки');
         }
         
-        return `
-        <div class="timeline-item ${urgencyClass}">
-            <div class="d-flex justify-content-between">
-                <div>
-                    <div class="timeline-date">${p.date}</div>
-                    <div><strong>Тип:</strong> ${p.type === 'examination' ? 'Осмотр' : 'Прививка'}</div>
-                    <div><strong>Описание:</strong> ${p.description}</div>
-                    <div><strong>Дней до:</strong> ${daysUntil > 0 ? daysUntil : 'просрочено'}</div>
+        const procedures = await response.json();
+        
+        const container = document.getElementById('upcomingProceduresList');
+        if (!procedures || procedures.length === 0) {
+            container.innerHTML = '<p class="text-muted">Нет предстоящих процедур</p>';
+            return;
+        }
+        
+        container.innerHTML = procedures.map(p => {
+            const daysUntil = p.days_until;
+            let urgencyClass = '';
+            let urgencyText = '';
+            let statusBadge = '';
+            
+            if (p.is_scheduled) {
+                statusBadge = '<span class="badge bg-warning ms-2">Запланировано</span>';
+            }
+            
+            if (daysUntil <= 0) {
+                urgencyClass = 'text-danger fw-bold';
+                urgencyText = '⚠️ Просрочено!';
+            } else if (daysUntil <= 3) {
+                urgencyClass = 'text-warning fw-bold';
+                urgencyText = '⚠️ Скоро!';
+            } else if (daysUntil <= 7) {
+                urgencyClass = 'text-info';
+                urgencyText = 'ℹ️ На этой неделе';
+            } else if (daysUntil <= 30) {
+                urgencyClass = 'text-secondary';
+                urgencyText = '📅 В этом месяце';
+            } else {
+                urgencyClass = 'text-muted';
+                urgencyText = `📅 Через ${daysUntil} дн.`;
+            }
+            
+            let daysText = '';
+            if (daysUntil > 0) {
+                daysText = `Через ${daysUntil} дн.`;
+            } else if (daysUntil === 0) {
+                daysText = 'Сегодня';
+            } else {
+                daysText = `Просрочено на ${Math.abs(daysUntil)} дн.`;
+            }
+            
+            let displayDate = p.date;
+            if (p.date && p.date.includes(' ')) {
+                displayDate = p.date.split(' ')[0] + ' ' + p.date.split(' ')[1].substring(0, 5);
+            }
+            
+            return `
+            <div class="timeline-item">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <div class="d-flex align-items-center">
+                            <span class="timeline-date">${displayDate}</span>
+                            ${statusBadge}
+                        </div>
+                        <div><strong>Тип:</strong> ${p.type === 'examination' ? '🔍 Осмотр' : '💉 Прививка'}</div>
+                        <div><strong>Описание:</strong> ${p.description}</div>
+                        <div class="${urgencyClass}"><strong>Статус:</strong> ${daysText}</div>
+                    </div>
+                    <div class="ms-3">
+                        <span class="badge ${daysUntil <= 0 ? 'bg-danger' : daysUntil <= 3 ? 'bg-warning' : 'bg-info'}">
+                            ${urgencyText}
+                        </span>
+                    </div>
                 </div>
-                <span class="badge ${urgencyClass}">${urgencyText}</span>
             </div>
-        </div>
-    `}).join('');
+        `}).join('');
+        
+    } catch (error) {
+        console.error('Ошибка загрузки предстоящих процедур:', error);
+        const container = document.getElementById('upcomingProceduresList');
+        container.innerHTML = '<p class="text-danger">Ошибка загрузки данных</p>';
+    }
 }
 
-// Добавление животного
 async function addAnimal() {
     const data = {
         name: document.getElementById('animalName').value,
@@ -309,7 +406,6 @@ async function addAnimal() {
     }
 }
 
-// Обновление статуса
 async function updateStatus() {
     if (!currentAnimalId) return;
     
@@ -336,7 +432,6 @@ async function updateStatus() {
     }
 }
 
-// Редактирование животного
 async function editAnimal(id) {
     try {
         const response = await fetch(`${API_URL}/animals/${id}`, {
@@ -365,7 +460,6 @@ async function editAnimal(id) {
     }
 }
 
-// Сохранение изменений животного
 async function saveAnimalChanges() {
     const animalId = document.getElementById('editAnimalId').value;
     
@@ -401,7 +495,6 @@ async function saveAnimalChanges() {
     }
 }
 
-// Показать форму добавления осмотра
 function showAddExamForm() {
     if (currentAnimalModal) {
         currentAnimalModal.hide();
@@ -417,14 +510,212 @@ function showAddExamForm() {
     }, 300);
 }
 
-// Предварительный просмотр осмотра
+function showScheduleExamForm() {
+    if (currentAnimalModal) {
+        currentAnimalModal.hide();
+    }
+    
+    document.getElementById('scheduleVeterinarian').value = '';
+    document.getElementById('scheduleDiagnosis').value = '';
+    document.getElementById('scheduleTreatment').value = '';
+    
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    document.getElementById('scheduleExamDate').value = tomorrow.toISOString().slice(0, 16);
+    document.getElementById('scheduleNotes').value = '';
+    
+    setTimeout(() => {
+        new bootstrap.Modal(document.getElementById('scheduleExamModal')).show();
+    }, 300);
+}
+
+async function addScheduledExamination() {
+    const selectedDate = new Date(document.getElementById('scheduleExamDate').value);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (selectedDate < today) {
+        alert('❌ Нельзя запланировать осмотр на прошедшую дату');
+        return;
+    }
+    
+    const veterinarian = document.getElementById('scheduleVeterinarian').value;
+    const diagnosis = document.getElementById('scheduleDiagnosis').value;
+    const treatment = document.getElementById('scheduleTreatment').value;
+    
+    if (!veterinarian || !diagnosis || !treatment) {
+        alert('Пожалуйста, заполните все обязательные поля');
+        return;
+    }
+
+    const data = {
+        animal_id: currentAnimalId,
+        veterinarian: veterinarian,
+        diagnosis: diagnosis,
+        treatment: treatment,
+        examination_date: document.getElementById('scheduleExamDate').value,
+        notes: document.getElementById('scheduleNotes').value,
+        is_scheduled: true
+    };
+    
+    console.log('Отправляемые данные осмотра:', data);
+    
+    try {
+        const response = await fetch(`${API_URL}/examinations`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('scheduleExamModal'));
+            modal.hide();
+            document.body.classList.remove('modal-open');
+            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+            
+            setTimeout(() => {
+                viewAnimal(data.animal_id);
+            }, 300);
+            
+            checkReminders();
+            alert('✅ Осмотр запланирован');
+        } else {
+            const err = await response.json();
+            alert('Ошибка: ' + (err.error || 'Недостаточно прав'));
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error);
+    }
+}
+
+function showScheduleVaccineForm() {
+    if (currentAnimalModal) {
+        currentAnimalModal.hide();
+    }
+    
+    document.getElementById('scheduleVaccineName').value = '';
+    document.getElementById('scheduleVaccineVeterinarian').value = '';
+    
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const year = tomorrow.getFullYear();
+    const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const day = String(tomorrow.getDate()).padStart(2, '0');
+    document.getElementById('scheduleVaccineDate').value = `${year}-${month}-${day}`;
+    document.getElementById('scheduleNextVaccineDate').value = '';
+    
+    setTimeout(() => {
+        new bootstrap.Modal(document.getElementById('scheduleVaccineModal')).show();
+    }, 300);
+}
+
+async function addScheduledVaccination() {
+    const selectedDate = new Date(document.getElementById('scheduleVaccineDate').value);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (selectedDate < today) {
+        alert('❌ Нельзя запланировать прививку на прошедшую дату');
+        return;
+    }
+    
+    const data = {
+        animal_id: currentAnimalId,
+        vaccine_name: document.getElementById('scheduleVaccineName').value,
+        veterinarian: document.getElementById('scheduleVaccineVeterinarian').value,
+        vaccination_date: document.getElementById('scheduleVaccineDate').value,
+        next_due_date: document.getElementById('scheduleNextVaccineDate').value || null,
+        is_scheduled: true
+    };
+    
+    try {
+        const response = await fetch(`${API_URL}/vaccinations`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('scheduleVaccineModal'));
+            modal.hide();
+            document.body.classList.remove('modal-open');
+            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+            
+            setTimeout(() => {
+                viewAnimal(data.animal_id);
+            }, 300);
+            
+            checkReminders();
+            alert('✅ Прививка запланирована');
+        } else {
+            const err = await response.json();
+            alert('Ошибка: ' + (err.error || 'Недостаточно прав'));
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error);
+    }
+}
+
+async function markExaminationCompleted(examId, animalId) {
+    try {
+        const response = await fetch(`${API_URL}/examinations/${examId}/complete`, {
+            method: 'PUT',
+            credentials: 'include'
+        });
+        
+        if (response.ok) {
+            alert('✅ Осмотр отмечен как проведенный');
+            await viewAnimal(animalId);
+            checkReminders();
+        } else {
+            const err = await response.json();
+            alert('Ошибка: ' + (err.error || 'Не удалось отметить'));
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error);
+    }
+}
+
+async function markVaccinationCompleted(vaccId, animalId) {
+    try {
+        const response = await fetch(`${API_URL}/vaccinations/${vaccId}/complete`, {
+            method: 'PUT',
+            credentials: 'include'
+        });
+        
+        if (response.ok) {
+            alert('✅ Прививка отмечена как проведенная');
+            await viewAnimal(animalId);
+            checkReminders();
+        } else {
+            const err = await response.json();
+            alert('Ошибка: ' + (err.error || 'Не удалось отметить'));
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error);
+    }
+}
+
 function previewExamination() {
+    const veterinarian = document.getElementById('veterinarian').value;
+    const diagnosis = document.getElementById('diagnosis').value;
+    const treatment = document.getElementById('treatment').value;
+    const examDate = document.getElementById('examDate').value;
+    
+    if (!veterinarian || !diagnosis || !treatment || !examDate) {
+        alert('Пожалуйста, заполните все обязательные поля');
+        return;
+    }
+    
     const data = {
         animal_id: parseInt(document.getElementById('examAnimalId').value),
-        veterinarian: document.getElementById('veterinarian').value,
-        diagnosis: document.getElementById('diagnosis').value,
-        treatment: document.getElementById('treatment').value,
-        examination_date: document.getElementById('examDate').value
+        veterinarian: veterinarian,
+        diagnosis: diagnosis,
+        treatment: treatment,
+        examination_date: examDate,
+        is_scheduled: false
     };
     
     document.getElementById('previewExamVeterinarian').textContent = data.veterinarian || '—';
@@ -442,9 +733,11 @@ function previewExamination() {
     }, 300);
 }
 
-// Подтверждение и добавление осмотра
 async function confirmAddExamination() {
-    if (!window.pendingExamData) return;
+    if (!window.pendingExamData) {
+        alert('Ошибка: данные не найдены');
+        return;
+    }
     
     try {
         const response = await fetch(`${API_URL}/examinations`, {
@@ -456,9 +749,12 @@ async function confirmAddExamination() {
         
         if (response.ok) {
             const confirmModal = bootstrap.Modal.getInstance(document.getElementById('confirmExamModal'));
-            confirmModal.hide();
+            if (confirmModal) {
+                confirmModal.hide();
+            }
+            
             document.body.classList.remove('modal-open');
-            document.querySelector('.modal-backdrop')?.remove();
+            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
             
             setTimeout(() => {
                 viewAnimal(window.pendingExamData.animal_id);
@@ -476,7 +772,6 @@ async function confirmAddExamination() {
     }
 }
 
-// Показать форму добавления прививки
 function showAddVaccineForm() {
     if (currentAnimalModal) {
         currentAnimalModal.hide();
@@ -492,14 +787,23 @@ function showAddVaccineForm() {
     }, 300);
 }
 
-// Предварительный просмотр прививки
 function previewVaccination() {
+    const vaccineName = document.getElementById('vaccineName').value;
+    const veterinarian = document.getElementById('vaccineVeterinarian').value;
+    const vaccineDate = document.getElementById('vaccineDate').value;
+    
+    if (!vaccineName || !veterinarian || !vaccineDate) {
+        alert('Пожалуйста, заполните все обязательные поля');
+        return;
+    }
+    
     const data = {
         animal_id: parseInt(document.getElementById('vaccineAnimalId').value),
-        vaccine_name: document.getElementById('vaccineName').value,
-        veterinarian: document.getElementById('vaccineVeterinarian').value,
-        vaccination_date: document.getElementById('vaccineDate').value,
-        next_due_date: document.getElementById('nextVaccineDate').value || null
+        vaccine_name: vaccineName,
+        veterinarian: veterinarian,
+        vaccination_date: vaccineDate,
+        next_due_date: document.getElementById('nextVaccineDate').value || null,
+        is_scheduled: false
     };
     
     document.getElementById('previewVaccineName').textContent = data.vaccine_name || '—';
@@ -517,7 +821,6 @@ function previewVaccination() {
     }, 300);
 }
 
-// Подтверждение и добавление прививки
 async function confirmAddVaccination() {
     if (!window.pendingVaccineData) return;
     
@@ -533,7 +836,7 @@ async function confirmAddVaccination() {
             const confirmModal = bootstrap.Modal.getInstance(document.getElementById('confirmVaccineModal'));
             confirmModal.hide();
             document.body.classList.remove('modal-open');
-            document.querySelector('.modal-backdrop')?.remove();
+            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
             
             setTimeout(() => {
                 viewAnimal(window.pendingVaccineData.animal_id);
@@ -551,7 +854,6 @@ async function confirmAddVaccination() {
     }
 }
 
-// Показать форму добавления рациона
 function showAddDietForm() {
     if (currentAnimalModal) {
         currentAnimalModal.hide();
@@ -561,7 +863,6 @@ function showAddDietForm() {
     }, 300);
 }
 
-// Добавление рациона
 async function addDiet() {
     const data = {
         animal_id: parseInt(document.getElementById('dietAnimalId').value),
@@ -585,7 +886,7 @@ async function addDiet() {
             const modal = bootstrap.Modal.getInstance(document.getElementById('addDietModal'));
             modal.hide();
             document.body.classList.remove('modal-open');
-            document.querySelector('.modal-backdrop')?.remove();
+            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
             
             setTimeout(() => {
                 viewAnimal(data.animal_id);
@@ -600,7 +901,6 @@ async function addDiet() {
     }
 }
 
-// Удаление рациона
 async function deleteDiet(dietId, animalId) {
     if (!confirm('Вы уверены, что хотите удалить этот рацион?')) {
         return;
@@ -624,7 +924,6 @@ async function deleteDiet(dietId, animalId) {
     }
 }
 
-// Показать модальное окно смены данных
 function showChangeCredentialsModal() {
     document.getElementById('newUsername').value = '';
     document.getElementById('newPassword').value = '';
@@ -633,7 +932,6 @@ function showChangeCredentialsModal() {
     new bootstrap.Modal(document.getElementById('changeCredentialsModal')).show();
 }
 
-// Смена логина/пароля
 async function changeCredentials() {
     const newUsername = document.getElementById('newUsername').value.trim();
     const newPassword = document.getElementById('newPassword').value;
@@ -682,68 +980,122 @@ async function changeCredentials() {
     }
 }
 
-// Функции для работы с расписанием и напоминаниями
-
-// Открыть окно расписания
 function showSchedule() {
     loadSchedule();
     new bootstrap.Modal(document.getElementById('scheduleModal')).show();
 }
 
-// Загрузить расписание процедур
 async function loadSchedule() {
     try {
         const response = await fetch(`${API_URL}/schedule/upcoming`, {
             credentials: 'include'
         });
+        
+        if (!response.ok) {
+            throw new Error('Ошибка загрузки');
+        }
+        
         const procedures = await response.json();
         
         const container = document.getElementById('scheduleList');
-        if (procedures.length === 0) {
+        if (!procedures || procedures.length === 0) {
             container.innerHTML = '<p class="text-muted">Нет запланированных процедур</p>';
             return;
         }
         
         const grouped = {};
         procedures.forEach(p => {
-            const date = p.date.split(' ')[0];
-            if (!grouped[date]) {
-                grouped[date] = [];
+            let datePart = p.date;
+            if (p.date.includes('T')) {
+                datePart = p.date.split('T')[0];
+            } else if (p.date.includes(' ')) {
+                datePart = p.date.split(' ')[0];
             }
-            grouped[date].push(p);
+            
+            if (!grouped[datePart]) {
+                grouped[datePart] = [];
+            }
+            grouped[datePart].push(p);
         });
         
         let html = '';
-        for (const [date, items] of Object.entries(grouped)) {
-            const dateObj = new Date(date);
+        const sortedDates = Object.keys(grouped).sort();
+        
+        for (const date of sortedDates) {
+            const items = grouped[date];
+            const dateObj = new Date(date + 'T12:00:00');
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             
             let dateClass = '';
-            if (dateObj < today) {
+            let dateText = '';
+            
+            const diffTime = dateObj - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays < 0) {
                 dateClass = 'text-danger';
-            } else if (dateObj.getTime() === today.getTime()) {
+                dateText = ` (просрочено на ${Math.abs(diffDays)} дн.)`;
+            } else if (diffDays === 0) {
                 dateClass = 'text-success fw-bold';
-            } else if (dateObj - today <= 3 * 24 * 60 * 60 * 1000) {
+                dateText = ' (сегодня)';
+            } else if (diffDays === 1) {
                 dateClass = 'text-warning';
+                dateText = ' (завтра)';
+            } else if (diffDays <= 3) {
+                dateClass = 'text-warning';
+                dateText = ` (через ${diffDays} дн.)`;
             }
             
-            html += `<h6 class="mt-3 ${dateClass}">${new Date(date).toLocaleDateString('ru-RU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h6>`;
+            const formattedDate = dateObj.toLocaleDateString('ru-RU', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+            
+            html += `<h6 class="mt-3 ${dateClass}">${formattedDate}${dateText}</h6>`;
+            
+            items.sort((a, b) => {
+                const timeA = a.date.includes('T') ? a.date.split('T')[1] : (a.date.split(' ')[1] || '00:00');
+                const timeB = b.date.includes('T') ? b.date.split('T')[1] : (b.date.split(' ')[1] || '00:00');
+                return timeA.localeCompare(timeB);
+            });
             
             items.forEach(p => {
                 const animal = p.animal_name || 'Неизвестное животное';
-                const time = p.date.split(' ')[1] || '00:00';
+                let timePart = '00:00';
+                if (p.date.includes('T')) {
+                    timePart = p.date.split('T')[1];
+                } else if (p.date.includes(' ')) {
+                    timePart = p.date.split(' ')[1];
+                }
+                const time = timePart.length > 5 ? timePart.substring(0, 5) : timePart;
+                
+                let statusBadge = '';
+                if (p.is_scheduled) {
+                    statusBadge = '<span class="badge bg-warning ms-1">Запл.</span>';
+                }
+                
+                let daysText = '';
+                if (p.days_until < 0) {
+                    daysText = ` <span class="text-danger">(просрочено на ${Math.abs(p.days_until)} дн.)</span>`;
+                } else if (p.days_until === 0) {
+                    daysText = ' <span class="text-success">(сегодня)</span>';
+                } else if (p.days_until === 1) {
+                    daysText = ' <span class="text-warning">(завтра)</span>';
+                }
                 
                 html += `
                     <div class="timeline-item">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
                                 <span class="badge bg-primary me-2">${time}</span>
-                                <strong>${animal}</strong> (${p.animal_species})
+                                <strong>${animal}</strong> (${p.animal_species}) ${statusBadge} ${daysText}
                                 <br>
                                 <small>${p.type === 'examination' ? '🔍 Осмотр' : '💉 Прививка'}: ${p.description}</small>
                             </div>
-                            <button class="btn btn-sm btn-outline-primary" onclick="viewAnimal(${p.animal_id})">
+                            <button class="btn btn-sm btn-outline-primary" onclick="goToAnimalFromSchedule(${p.animal_id})">
                                 Перейти
                             </button>
                         </div>
@@ -760,7 +1112,26 @@ async function loadSchedule() {
     }
 }
 
-// Проверка напоминаний
+async function goToAnimalFromSchedule(animalId) {
+    try {
+        const scheduleModal = bootstrap.Modal.getInstance(document.getElementById('scheduleModal'));
+        if (scheduleModal) {
+            scheduleModal.hide();
+        }
+        
+        setTimeout(() => {
+            if (currentAnimalModal) {
+                currentAnimalModal.hide();
+                currentAnimalModal = null;
+            }
+            
+            viewAnimal(animalId);
+        }, 300);
+    } catch (error) {
+        console.error('Ошибка при переходе:', error);
+    }
+}
+
 async function checkReminders() {
     try {
         const response = await fetch(`${API_URL}/reminders`, {
@@ -793,12 +1164,14 @@ async function checkReminders() {
                 urgencyClass = 'text-warning';
             }
             
+            const statusText = r.is_scheduled ? ' (запл.)' : '';
+            
             return `
             <div class="timeline-item ${urgencyClass}">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <span class="me-2">${icon}</span>
-                        <strong>${r.animal_name}</strong> (${r.animal_species})
+                        <strong>${r.animal_name}</strong> (${r.animal_species})${statusText}
                         <br>
                         <small>${r.description}</small>
                         <br>
@@ -821,7 +1194,6 @@ async function checkReminders() {
     }
 }
 
-// Запуск периодической проверки напоминаний
 function startReminderChecker() {
     if (reminderInterval) {
         clearInterval(reminderInterval);
@@ -829,7 +1201,6 @@ function startReminderChecker() {
     reminderInterval = setInterval(checkReminders, 5 * 60 * 1000);
 }
 
-// Отмена подтверждения
 function cancelConfirm() {
     window.pendingExamData = null;
     window.pendingVaccineData = null;
@@ -841,18 +1212,25 @@ function cancelConfirm() {
     if (confirmVaccineModal) confirmVaccineModal.hide();
 }
 
-// Переход к отчетам
 function goToReports() {
     window.location.href = '/reports';
 }
 
-// Обработчик закрытия модальных окон
 document.addEventListener('hidden.bs.modal', function () {
     document.body.classList.remove('modal-open');
-    document.querySelector('.modal-backdrop')?.remove();
+    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
 });
 
-// При загрузке страницы
 document.addEventListener('DOMContentLoaded', () => {
     checkAuth().then(() => loadAnimals());
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const animalId = sessionStorage.getItem('returnToAnimal');
+    if (animalId) {
+        sessionStorage.removeItem('returnToAnimal');
+        setTimeout(() => {
+            viewAnimal(parseInt(animalId));
+        }, 1000);
+    }
 });

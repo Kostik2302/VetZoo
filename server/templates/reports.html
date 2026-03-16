@@ -28,9 +28,6 @@
             <li class="nav-item">
                 <a class="nav-link" data-bs-toggle="tab" href="#vaccinationReport">Вакцинация</a>
             </li>
-            <li class="nav-item">
-                <a class="nav-link" data-bs-toggle="tab" href="#examinationReport">Осмотры</a>
-            </li>
         </ul>
 
         <!-- Содержимое вкладок -->
@@ -95,41 +92,6 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Отчет по осмотрам -->
-            <div class="tab-pane fade" id="examinationReport">
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="card mb-4">
-                            <div class="card-header">
-                                <h5>Статистика осмотров</h5>
-                            </div>
-                            <div class="card-body">
-                                <div id="examinationStats" class="mb-3"></div>
-                                <canvas id="examinationChart" style="height: 300px;"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="card mb-4">
-                            <div class="card-header">
-                                <h5>Частые диагнозы</h5>
-                            </div>
-                            <div class="card-body">
-                                <div id="commonDiagnoses" class="stats-table"></div>
-                            </div>
-                        </div>
-                        <div class="card mb-4">
-                            <div class="card-header">
-                                <h5>Активность ветеринаров</h5>
-                            </div>
-                            <div class="card-body">
-                                <div id="vetActivity"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
 
         <!-- Кнопки экспорта -->
@@ -142,7 +104,6 @@
                     <div class="card-body">
                         <button class="btn btn-success me-2" onclick="exportReport('health', 'json')">📥 Экспорт здоровья (JSON)</button>
                         <button class="btn btn-success me-2" onclick="exportReport('vaccinations', 'json')">📥 Экспорт вакцинации (JSON)</button>
-                        <button class="btn btn-success me-2" onclick="exportReport('examinations', 'json')">📥 Экспорт осмотров (JSON)</button>
                     </div>
                 </div>
             </div>
@@ -152,7 +113,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         const API_URL = 'http://localhost:5000/api';
-        let healthChart, vaccinationChart, examinationChart, vaccinationTimelineChart;
+        let healthChart, vaccinationChart, vaccinationTimelineChart;
 
         // Проверка авторизации
         fetch(`${API_URL}/me`, { credentials: 'include' })
@@ -173,7 +134,6 @@
         async function loadAllReports() {
             await loadHealthReport();
             await loadVaccinationReport();
-            await loadExaminationReport();
         }
 
         // Отчет по здоровью
@@ -182,6 +142,19 @@
                 credentials: 'include'
             });
             const data = await response.json();
+            
+            // Определяем цвета для каждого статуса
+            const statusColors = {
+                'здоров': '#28a745',      // Зеленый для здоровых
+                'болен': '#dc3545',        // Красный для больных
+                'на лечении': '#ffc107',   // Желтый для на лечении
+                'карантин': '#17a2b8',     // Голубой для карантина
+                'снят с учета': '#6c757d'  // Серый для снятых с учета
+            };
+            
+            const backgroundColors = Object.keys(data.status_counts).map(status => 
+                statusColors[status] || '#6c757d'
+            );
             
             // График статусов здоровья
             const ctx = document.getElementById('healthChart').getContext('2d');
@@ -193,9 +166,7 @@
                     labels: Object.keys(data.status_counts),
                     datasets: [{
                         data: Object.values(data.status_counts),
-                        backgroundColor: [
-                            '#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6c757d'
-                        ]
+                        backgroundColor: backgroundColors
                     }]
                 },
                 options: {
@@ -293,7 +264,7 @@
                 data.animals_without_vaccinations.forEach(a => {
                     html += `<li class="list-group-item d-flex justify-content-between align-items-center">
                         ${a.name} (${a.species})
-                        <button class="btn btn-sm btn-outline-primary" onclick="window.location.href='/'">Перейти</button>
+                        <button class="btn btn-sm btn-outline-primary" onclick="goToAnimalFromReports(${a.id})">Перейти</button>
                     </li>`;
                 });
                 html += '</ul>';
@@ -301,68 +272,23 @@
             }
         }
 
-        // Отчет по осмотрам
-        async function loadExaminationReport() {
-            const response = await fetch(`${API_URL}/reports/examinations`, {
-                credentials: 'include'
-            });
-            const data = await response.json();
-
-            // Общая статистика
-            const statsDiv = document.getElementById('examinationStats');
-            statsDiv.innerHTML = `
-                <div class="alert alert-info">
-                    <strong>Всего осмотров:</strong> ${data.total_examinations}<br>
-                    <strong>Осмотров за последние 3 месяца:</strong> ${data.recent_examinations}<br>
-                    <strong>Количество ветеринаров:</strong> ${Object.keys(data.examinations_by_vet).length}
-                </div>
-            `;
-
-            // График осмотров по месяцам
-            const ctx = document.getElementById('examinationChart').getContext('2d');
-            if (examinationChart) examinationChart.destroy();
-            
-            const months = Object.keys(data.examinations_by_month).sort();
-            examinationChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: months,
-                    datasets: [{
-                        label: 'Количество осмотров',
-                        data: months.map(m => data.examinations_by_month[m]),
-                        borderColor: '#007bff',
-                        backgroundColor: 'rgba(0, 123, 255, 0.1)',
-                        fill: true
-                    }]
-                },
-                options: {
-                    responsive: true
-                }
-            });
-
-            // Частые диагнозы
-            const diagnosesDiv = document.getElementById('commonDiagnoses');
-            let html = '<table class="table table-sm">';
-            html += '<tr><th>Диагноз</th><th>Частота</th></tr>';
-            
-            for (const [diagnosis, count] of Object.entries(data.common_diagnoses)) {
-                html += `<tr><td>${diagnosis}</td><td>${count}</td></tr>`;
-            }
-            html += '</table>';
-            diagnosesDiv.innerHTML = html;
-
-            // Активность ветеринаров
-            const vetDiv = document.getElementById('vetActivity');
-            let vetHtml = '<table class="table table-sm">';
-            vetHtml += '<tr><th>Ветеринар</th><th>Осмотров</th></tr>';
-            
-            const sortedVets = Object.entries(data.examinations_by_vet).sort((a, b) => b[1] - a[1]);
-            for (const [vet, count] of sortedVets) {
-                vetHtml += `<tr><td>${vet}</td><td>${count}</td></tr>`;
-            }
-            vetHtml += '</table>';
-            vetDiv.innerHTML = vetHtml;
+        // Функция для перехода к животному из отчетов
+        function goToAnimalFromReports(animalId) {
+            sessionStorage.setItem('returnToAnimal', animalId);
+            window.location.href = '/';
         }
+
+        // Проверяем при загрузке главной страницы, нужно ли открыть животное
+        document.addEventListener('DOMContentLoaded', function() {
+            const animalId = sessionStorage.getItem('returnToAnimal');
+            if (animalId) {
+                sessionStorage.removeItem('returnToAnimal');
+                // Небольшая задержка для загрузки списка животных
+                setTimeout(() => {
+                    viewAnimal(parseInt(animalId));
+                }, 1000);
+            }
+        });
 
         // Экспорт отчета
         async function exportReport(type, format) {
