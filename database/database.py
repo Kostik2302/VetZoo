@@ -4,6 +4,7 @@ from datetime import datetime
 class Database:
     def __init__(self, db_name="vetzoo.db"):
         self.conn = sqlite3.connect(db_name, check_same_thread=False)
+        self.conn.row_factory = sqlite3.Row
         self.cursor = self.conn.cursor()
         self.create_tables()
     
@@ -33,7 +34,7 @@ class Database:
                 diagnosis TEXT,
                 treatment TEXT,
                 notes TEXT,
-                FOREIGN KEY (animal_id) REFERENCES animals (id)
+                FOREIGN KEY (animal_id) REFERENCES animals (id) ON DELETE CASCADE
             )
         ''')
         
@@ -46,7 +47,7 @@ class Database:
                 vaccine_name TEXT NOT NULL,
                 veterinarian TEXT NOT NULL,
                 next_due_date TEXT,
-                FOREIGN KEY (animal_id) REFERENCES animals (id)
+                FOREIGN KEY (animal_id) REFERENCES animals (id) ON DELETE CASCADE
             )
         ''')
         
@@ -61,7 +62,7 @@ class Database:
                 schedule TEXT,
                 start_date TEXT NOT NULL,
                 end_date TEXT,
-                FOREIGN KEY (animal_id) REFERENCES animals (id)
+                FOREIGN KEY (animal_id) REFERENCES animals (id) ON DELETE CASCADE
             )
         ''')
         
@@ -89,7 +90,7 @@ class Database:
         return self.cursor.lastrowid
     
     def get_all_animals(self):
-        self.cursor.execute('SELECT * FROM animals')
+        self.cursor.execute('SELECT * FROM animals ORDER BY name')
         return self.cursor.fetchall()
     
     def get_animal(self, animal_id):
@@ -191,7 +192,7 @@ class Database:
         return self.cursor.fetchone()
     
     def get_all_users(self):
-        self.cursor.execute('SELECT id, username, full_name, role, created_at FROM users')
+        self.cursor.execute('SELECT id, username, full_name, role, created_at FROM users ORDER BY id')
         return self.cursor.fetchall()
     
     def delete_user(self, user_id):

@@ -12,8 +12,13 @@
     <nav class="navbar navbar-dark bg-primary">
         <div class="container-fluid">
             <span class="navbar-brand mb-0 h1">🐾 VetZoo Control System</span>
-            <div class="d-flex text-white">
-                <span id="userDisplay" class="me-3"></span>
+            <div class="d-flex text-white align-items-center">
+                <span class="me-3 position-relative">
+                    <span id="userDisplay" class="me-3"></span>
+                    <span class="badge bg-danger position-absolute top-0 start-100 translate-middle" id="reminderBadge" style="display: none;">0</span>
+                </span>
+                <button class="btn btn-sm btn-outline-light me-2" onclick="showSchedule()" id="scheduleBtn">📅 Расписание</button>
+                <button class="btn btn-sm btn-outline-light me-2" onclick="goToReports()" id="reportsBtn">📊 Отчеты</button>
                 <button class="btn btn-sm btn-outline-light me-2" onclick="showChangeCredentialsModal()" id="changeCredentialsBtn">⚙️ Настройки</button>
                 <a href="/logout" class="btn btn-sm btn-light">Выйти</a>
             </div>
@@ -145,7 +150,10 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="viewAnimalTitle">Информация о животном</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <div>
+                        <button class="btn btn-sm btn-warning me-2" id="editAnimalBtn" style="display: none;" onclick="editAnimal(currentAnimalId)">✏️ Редактировать</button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
                 </div>
                 <div class="modal-body">
                     <ul class="nav nav-tabs" id="animalTabs">
@@ -160,6 +168,9 @@
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" data-bs-toggle="tab" href="#diets">Рацион</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" data-bs-toggle="tab" href="#upcoming">Предстоящие</a>
                         </li>
                     </ul>
                     
@@ -190,6 +201,9 @@
                         <div class="tab-pane fade" id="diets">
                             <button class="btn btn-sm btn-success mb-3" id="addDietBtn" style="display: none;" onclick="showAddDietForm()">➕ Добавить рацион</button>
                             <div id="dietsList"></div>
+                        </div>
+                        <div class="tab-pane fade" id="upcoming">
+                            <div id="upcomingProceduresList"></div>
                         </div>
                     </div>
                 </div>
@@ -228,7 +242,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                    <button type="button" class="btn btn-primary" onclick="addExamination()">Сохранить</button>
+                    <button type="button" class="btn btn-primary" onclick="previewExamination()">Далее</button>
                 </div>
             </div>
         </div>
@@ -265,7 +279,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
-                    <button type="button" class="btn btn-primary" onclick="addVaccination()">Сохранить</button>
+                    <button type="button" class="btn btn-primary" onclick="previewVaccination()">Далее</button>
                 </div>
             </div>
         </div>
@@ -316,6 +330,100 @@
         </div>
     </div>
 
+    <!-- Модальное окно подтверждения осмотра -->
+    <div class="modal fade" id="confirmExamModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Подтверждение осмотра</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Проверьте введённые данные:</p>
+                    <table class="table table-sm">
+                        <tr>
+                            <th>Ветеринар:</th>
+                            <td id="previewExamVeterinarian"></td>
+                        </tr>
+                        <tr>
+                            <th>Диагноз:</th>
+                            <td id="previewExamDiagnosis"></td>
+                        </tr>
+                        <tr>
+                            <th>Лечение:</th>
+                            <td id="previewExamTreatment"></td>
+                        </tr>
+                        <tr>
+                            <th>Дата:</th>
+                            <td id="previewExamDate"></td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="cancelConfirm()">Назад</button>
+                    <button type="button" class="btn btn-primary" onclick="confirmAddExamination()">Подтвердить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно подтверждения прививки -->
+    <div class="modal fade" id="confirmVaccineModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Подтверждение прививки</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Проверьте введённые данные:</p>
+                    <table class="table table-sm">
+                        <tr>
+                            <th>Вакцина:</th>
+                            <td id="previewVaccineName"></td>
+                        </tr>
+                        <tr>
+                            <th>Ветеринар:</th>
+                            <td id="previewVaccineVeterinarian"></td>
+                        </tr>
+                        <tr>
+                            <th>Дата прививки:</th>
+                            <td id="previewVaccineDate"></td>
+                        </tr>
+                        <tr>
+                            <th>Следующая:</th>
+                            <td id="previewNextVaccineDate"></td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="cancelConfirm()">Назад</button>
+                    <button type="button" class="btn btn-primary" onclick="confirmAddVaccination()">Подтвердить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно расписания -->
+    <div class="modal fade" id="scheduleModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">📅 Расписание процедур</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <span class="badge bg-danger me-2">Просрочено</span>
+                        <span class="badge bg-warning me-2">Скоро (3 дня)</span>
+                        <span class="badge bg-success me-2">Сегодня</span>
+                    </div>
+                    <div id="scheduleList"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Модальное окно смены логина/пароля -->
     <div class="modal fade" id="changeCredentialsModal" tabindex="-1">
         <div class="modal-dialog">
@@ -343,6 +451,21 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
                     <button type="button" class="btn btn-primary" onclick="changeCredentials()">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно напоминаний (скрытое, используется для отображения) -->
+    <div class="modal fade" id="remindersModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">🔔 Напоминания</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="remindersList"></div>
                 </div>
             </div>
         </div>

@@ -39,6 +39,12 @@
     border-left: 3px solid #007bff;
     margin-bottom: 10px;
     background-color: #f8f9fa;
+    transition: all 0.2s;
+}
+
+.timeline-item:hover {
+    transform: translateX(5px);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
 }
 
 .timeline-date {
@@ -46,7 +52,137 @@
     color: #6c757d;
 }
 
-/* Класс для скрытия элементов через JS (можно не использовать, но на всякий случай) */
+/* Класс для скрытия элементов через JS */
 .hidden {
     display: none !important;
+}
+
+/* Стили для напоминаний и расписания */
+.reminder-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background-color: #dc3545;
+    color: white;
+    border-radius: 50%;
+    padding: 2px 6px;
+    font-size: 0.7rem;
+}
+
+.urgency-high {
+    border-left: 3px solid #dc3545 !important;
+    background-color: #fff5f5;
+}
+
+.urgency-medium {
+    border-left: 3px solid #ffc107 !important;
+    background-color: #fff9e6;
+}
+
+.urgency-low {
+    border-left: 3px solid #17a2b8 !important;
+}
+
+/* Анимация для новых уведомлений */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+.new-reminder {
+    animation: pulse 1s ease-in-out;
+}
+
+/* Улучшенные карточки для расписания */
+.schedule-item {
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.schedule-item:hover {
+    transform: translateX(5px);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+/* Стили для отчетов */
+.report-card {
+    transition: all 0.3s;
+    margin-bottom: 20px;
+}
+
+.report-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #007bff;
+}
+
+.stat-label {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.warning-badge {
+    background-color: #ffc107;
+    color: #856404;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+}
+
+.danger-badge {
+    background-color: #dc3545;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+}
+
+/* Стили для графиков */
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+/* Анимация загрузки */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-spinner {
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #007bff;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 20px auto;
+}
+
+/* Стили для таблиц в отчетах */
+.stats-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.stats-table th {
+    background-color: #f8f9fa;
+    padding: 8px;
+    text-align: left;
+}
+
+.stats-table td {
+    padding: 8px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.stats-table tr:hover {
+    background-color: #f8f9fa;
 }
